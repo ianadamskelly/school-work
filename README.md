@@ -33,6 +33,37 @@ areas) and three demo accounts:
 Change these passwords (Admin → Everyone → Reset password) before letting real users in.
 To start from a clean slate, stop the server and delete the `data` folder.
 
+## Deploy on Coolify (hilal.hia.edu.so)
+
+The repo ships with a `Dockerfile`, so Coolify can build and run it directly.
+
+1. **DNS first.** At your DNS provider for `hia.edu.so`, add an **A record** for
+   `hilal` pointing to your Coolify server's public IP address. Wait until
+   `hilal.hia.edu.so` resolves (a few minutes usually).
+2. **Create the app.** In Coolify: *Projects → Add resource → Public Repository*,
+   paste `https://github.com/ianadamskelly/school-work.git`, branch `main`.
+   Coolify detects the Dockerfile automatically (Build Pack: **Dockerfile**).
+   Port is **3000**.
+3. **Set the domain.** In the app's settings, set Domain to
+   `https://hilal.hia.edu.so`. Coolify's proxy will fetch a Let's Encrypt
+   certificate automatically once DNS resolves.
+4. **Environment variable.** Add `SESSION_SECRET` with a long random value
+   (e.g. run `openssl rand -hex 32` and paste the result). The app refuses to
+   start in production without it — that's deliberate.
+5. **Persistent storage — do not skip.** Add a **Volume Mount** with destination
+   path `/app/data`. This is where the SQLite database lives; without it, every
+   redeploy wipes all users and logged work.
+6. **Deploy.** First visit `https://hilal.hia.edu.so`, sign in as the admin,
+   and immediately change all three seeded passwords (Admin → Everyone →
+   Reset password).
+
+Redeploys (pushing to `main` and clicking Deploy, or enabling auto-deploy) keep
+the database because it lives on the volume.
+
+**Backups:** the whole system state is the single file `school.db` inside the
+`/app/data` volume on the server. Copy it somewhere safe on a schedule — that
+is a complete backup.
+
 ## How it fits together
 
 - **Admin** adds people, sets who reports to whom, and builds role templates.

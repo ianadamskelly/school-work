@@ -3,9 +3,17 @@ import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import { getDb } from "./db";
 
-const SECRET = new TextEncoder().encode(
-  process.env.SESSION_SECRET ?? "dev-secret-change-me-before-going-live"
-);
+// Checked lazily (not at module load) so `next build` can run without the secret.
+function getSecret(): Uint8Array {
+  if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+    throw new Error(
+      "SESSION_SECRET is not set. Add it as an environment variable (a long random string) before running in production."
+    );
+  }
+  return new TextEncoder().encode(
+    process.env.SESSION_SECRET ?? "dev-secret-change-me-before-going-live"
+  );
+}
 const COOKIE = "school_session";
 
 export type SessionUser = {
@@ -23,11 +31,12 @@ export async function createSession(userId: number) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("30d")
-    .sign(SECRET);
+    .sign(getSecret());
   const jar = await cookies();
   jar.set(COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
   });
@@ -51,7 +60,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   const token = jar.get(COOKIE)?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, getSecret());
     const uid = payload.uid as number;
     const user = getDb()
       .prepare(
