@@ -19,6 +19,25 @@ export function getDb(): Database.Database {
   return db;
 }
 
+function hasColumn(db: Database.Database, table: string, column: string): boolean {
+  return !!db
+    .prepare("SELECT 1 FROM pragma_table_info(?) WHERE name = ?")
+    .get(table, column);
+}
+
+// Adds columns introduced after the first deployment; safe to run on every start.
+function upgrade(db: Database.Database) {
+  const add = (table: string, column: string, ddl: string) => {
+    if (!hasColumn(db, table, column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+  };
+  add("weekly_summaries", "focus_area_2_id", "focus_area_2_id INTEGER REFERENCES focus_areas(id) ON DELETE SET NULL");
+  add("weekly_summaries", "status", "status TEXT NOT NULL DEFAULT 'draft'");
+  add("weekly_summaries", "progress_percent", "progress_percent INTEGER");
+  add("weekly_summaries", "manager_comment", "manager_comment TEXT NOT NULL DEFAULT ''");
+  add("weekly_summaries", "seen_at", "seen_at TEXT");
+  add("monthly_reviews", "objective_outcome", "objective_outcome TEXT NOT NULL DEFAULT ''");
+}
+
 function migrate(db: Database.Database) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS templates (
@@ -135,7 +154,36 @@ function migrate(db: Database.Database) {
       commentary TEXT NOT NULL DEFAULT '',
       UNIQUE (review_id, tor_area_id)
     );
+
+    CREATE TABLE IF NOT EXISTS objectives (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      manager_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS monthly_plans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      year INTEGER NOT NULL,
+      month INTEGER NOT NULL,
+      objective_id INTEGER NOT NULL REFERENCES objectives(id),
+      status TEXT NOT NULL DEFAULT 'proposed' CHECK (status IN ('proposed','approved')),
+      approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      approved_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (user_id, year, month)
+    );
+
+    CREATE TABLE IF NOT EXISTS monthly_plan_focus (
+      plan_id INTEGER NOT NULL REFERENCES monthly_plans(id) ON DELETE CASCADE,
+      focus_area_id INTEGER NOT NULL REFERENCES focus_areas(id) ON DELETE CASCADE,
+      UNIQUE (plan_id, focus_area_id)
+    );
   `);
+  upgrade(db);
 }
 
 function seed(db: Database.Database) {
@@ -213,6 +261,20 @@ function seed(db: Database.Database) {
       "Principal",
       directorId,
       templateId
+    );
+
+    const insertObjective = db.prepare(
+      "INSERT INTO objectives (manager_id, title, description) VALUES (?, ?, ?)"
+    );
+    insertObjective.run(
+      directorId,
+      "Achieve full IB compliance ahead of the five-year evaluation",
+      "Close all self-evaluation gaps and have evidence files ready for the visiting team."
+    );
+    insertObjective.run(
+      directorId,
+      "Raise teaching quality through observation and coaching",
+      "Every teacher observed at least once, with feedback and follow-up support in place."
     );
   });
 

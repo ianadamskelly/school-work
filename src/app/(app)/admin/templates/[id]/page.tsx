@@ -6,7 +6,7 @@ import { Card, Field, PageHeader, Badge, inputCls, btnPrimary } from "@/componen
 
 type Template = { id: number; name: string; description: string };
 type Focus = { id: number; name: string };
-type Category = { id: number; name: string; day_code: string | null; week_number: number | null; focus_area: string | null };
+type Category = { id: number; name: string; focus_area: string | null };
 type Item = { id: number; name: string };
 
 function DeleteButton({ templateId, table, id }: { templateId: number; table: string; id: number }) {
@@ -38,9 +38,9 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
     .all(template.id) as Focus[];
   const categories = db
     .prepare(
-      `SELECT tc.id, tc.name, tc.day_code, tc.week_number, fa.name AS focus_area
+      `SELECT tc.id, tc.name, fa.name AS focus_area
        FROM task_categories tc LEFT JOIN focus_areas fa ON fa.id = tc.focus_area_id
-       WHERE tc.template_id = ? ORDER BY tc.day_code, tc.week_number, tc.sort`
+       WHERE tc.template_id = ? ORDER BY tc.sort`
     )
     .all(template.id) as Category[];
   const torAreas = db
@@ -54,10 +54,10 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
     <div className="space-y-6">
       <PageHeader
         title={`Template: ${template.name}`}
-        subtitle={template.description || "Task categories carry an optional rotation slot (day code A/B/C plus week of the month) that powers the daily suggestion."}
+        subtitle={template.description || "Every task category belongs to a focus area — that link is what connects daily work to weekly focus and the monthly objective."}
       />
 
-      <Card title="Task categories and rotation">
+      <Card title="Task categories">
         {categories.length === 0 ? (
           <p className="mb-4 text-sm text-slate-500">No task categories yet — add the main duties from the job description below.</p>
         ) : (
@@ -65,14 +65,13 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
             {categories.map((c) => (
               <li key={c.id} className="flex flex-wrap items-center gap-2 py-2">
                 <span className="flex-1 text-sm font-medium text-slate-800">{c.name}</span>
-                {c.focus_area && <Badge tone="blue">{c.focus_area}</Badge>}
-                {c.day_code && c.week_number && <Badge>Day {c.day_code} · week {c.week_number}</Badge>}
+                {c.focus_area ? <Badge tone="blue">{c.focus_area}</Badge> : <Badge tone="amber">no focus area</Badge>}
                 <DeleteButton templateId={template.id} table="task_categories" id={c.id} />
               </li>
             ))}
           </ul>
         )}
-        <form action={addTaskCategory} className="grid grid-cols-1 gap-3 rounded-lg bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-5">
+        <form action={addTaskCategory} className="grid grid-cols-1 gap-3 rounded-lg bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-4">
           <input type="hidden" name="template_id" value={template.id} />
           <div className="lg:col-span-2">
             <Field label="New task category">
@@ -87,23 +86,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
               ))}
             </select>
           </Field>
-          <Field label="Day code">
-            <select name="day_code" defaultValue="" className={inputCls}>
-              <option value="">—</option>
-              <option>A</option>
-              <option>B</option>
-              <option>C</option>
-            </select>
-          </Field>
-          <div className="flex items-end gap-2">
-            <Field label="Week">
-              <select name="week_number" defaultValue="" className={inputCls}>
-                <option value="">—</option>
-                {[1, 2, 3, 4].map((w) => (
-                  <option key={w} value={w}>{w}</option>
-                ))}
-              </select>
-            </Field>
+          <div className="flex items-end">
             <button type="submit" className={btnPrimary}>Add</button>
           </div>
         </form>

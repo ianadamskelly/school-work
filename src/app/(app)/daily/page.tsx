@@ -1,15 +1,19 @@
+import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
 import { addDailyLog, setDailyStatus, deleteDailyLog } from "@/lib/actions";
-import { dayCodeFor, weekOfMonth, todayISO } from "@/lib/rotation";
+import { weekOfMonth, todayISO } from "@/lib/rotation";
+import { getMonthlyPlan, getWeekFocus } from "@/lib/plan";
 import { Card, Field, PageHeader, Badge, SavedNotice, inputCls, btnPrimary } from "@/components/ui";
 
 type Option = { id: number; name: string };
+type CategoryRow = { id: number; name: string; focus_area_id: number | null };
 type LogRow = {
   id: number;
   log_date: string;
   activity: string;
   category: string | null;
+  category_focus_id: number | null;
   department: string | null;
   hours: number;
   outcome: string;
@@ -29,31 +33,41 @@ export default async function DailyPage({
   const db = getDb();
   const today = todayISO();
   const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const week = weekOfMonth(now);
 
   const categories = user.template_id
     ? (db
-        .prepare("SELECT id, name FROM task_categories WHERE template_id = ? ORDER BY sort")
-        .all(user.template_id) as Option[])
+        .prepare("SELECT id, name, focus_area_id FROM task_categories WHERE template_id = ? ORDER BY sort")
+        .all(user.template_id) as CategoryRow[])
     : [];
   const departments = user.template_id
-    ? (db
-        .prepare("SELECT id, name FROM departments WHERE template_id = ? ORDER BY sort")
-        .all(user.template_id) as Option[])
+    ? (db.prepare("SELECT id, name FROM departments WHERE template_id = ? ORDER BY sort").all(user.template_id) as Option[])
     : [];
 
-  const code = dayCodeFor(now);
-  const week = weekOfMonth(now);
-  const suggested =
-    user.template_id && code
-      ? (db
-          .prepare("SELECT id FROM task_categories WHERE template_id = ? AND day_code = ? AND week_number = ?")
-          .get(user.template_id, code, week) as { id: number } | undefined)
-      : undefined;
+  const plan = getMonthlyPlan(user.id, year, month);
+  const weekFocus = getWeekFocus(user.id, year, month, week);
+  const focusIds = new Set(weekFocus.map((f) => f.id));
+  const onFocus = categories.filter((c) => c.focus_area_id !== null && focusIds.has(c.focus_area_id));
+  const offFocus = categories.filter((c) => c.focus_area_id === null || !focusIds.has(c.focus_area_id));
+
+  // Focus choices per week of this month, for flagging older entries too.
+  const weekFocusRows = db
+    .prepare(
+      "SELECT year, month, week_of_month, focus_area_id, focus_area_2_id FROM weekly_summaries WHERE user_id = ?"
+    )
+    .all(user.id) as { year: number; month: number; week_of_month: number; focus_area_id: number | null; focus_area_2_id: number | null }[];
+  const focusByWeek = new Map<string, Set<number>>();
+  weekFocusRows.forEach((r) => {
+    const ids = [r.focus_area_id, r.focus_area_2_id].filter((v): v is number => v !== null);
+    focusByWeek.set(`${r.year}-${r.month}-${r.week_of_month}`, new Set(ids));
+  });
 
   const logs = db
     .prepare(
-      `SELECT dl.id, dl.log_date, dl.activity, tc.name AS category, d.name AS department,
-              dl.hours, dl.outcome, dl.followup_required, dl.followup_date, dl.priority, dl.status
+      `SELECT dl.id, dl.log_date, dl.activity, tc.name AS category, tc.focus_area_id AS category_focus_id,
+              d.name AS department, dl.hours, dl.outcome, dl.followup_required, dl.followup_date, dl.priority, dl.status
        FROM daily_logs dl
        LEFT JOIN task_categories tc ON tc.id = dl.category_id
        LEFT JOIN departments d ON d.id = dl.department_id
@@ -66,22 +80,68 @@ export default async function DailyPage({
   const isOverdue = (l: LogRow) =>
     l.followup_required === 1 && l.status !== "Completed" && !!l.followup_date && l.followup_date < today;
 
+  const isOffPlan = (l: LogRow) => {
+    if (l.category_focus_id === null) return false;
+    const d = new Date(l.log_date + "T00:00:00");
+    const key = `${d.getFullYear()}-${d.getMonth() + 1}-${weekOfMonth(d)}`;
+    const ids = focusByWeek.get(key);
+    return !!ids && ids.size > 0 && !ids.has(l.category_focus_id);
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader title="My day" subtitle="Log what you worked on. Short entries are fine — a minute is all it should take." />
       <SavedNotice show={params.saved === "1"} text="Your entry has been saved." />
+
+      {weekFocus.length > 0 ? (
+        <Card>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-500">This week&apos;s focus</span>
+            {weekFocus.map((f) => (
+              <Badge key={f.id} tone="blue">{f.name}</Badge>
+            ))}
+            {plan && <span className="text-xs text-slate-500">serving: {plan.objective_title}</span>}
+          </div>
+        </Card>
+      ) : (
+        <Card>
+          <p className="text-sm text-slate-600">
+            No focus areas chosen for this week yet.{" "}
+            <Link href="/weekly" className="font-medium text-navy-600 underline">Pick this week&apos;s focus</Link>{" "}
+            so your daily entries line up with your monthly objective.
+          </p>
+        </Card>
+      )}
 
       <Card title="Add an entry">
         <form action={addDailyLog} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Date">
             <input name="log_date" type="date" defaultValue={today} required className={inputCls} />
           </Field>
-          <Field label="Task category" hint={suggested ? "Pre-selected from today's rotation — change it if you worked on something else." : undefined}>
-            <select name="category_id" defaultValue={suggested?.id ?? ""} className={inputCls}>
+          <Field
+            label="Task category"
+            hint={weekFocus.length > 0 ? "Anything under “Other” will be flagged as off-plan — that's allowed, just visible." : undefined}
+          >
+            <select name="category_id" defaultValue="" className={inputCls}>
               <option value="">— Choose —</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
+              {weekFocus.length > 0 ? (
+                <>
+                  <optgroup label="This week's focus">
+                    {onFocus.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Other (off-plan)">
+                    {offFocus.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </optgroup>
+                </>
+              ) : (
+                categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))
+              )}
             </select>
           </Field>
           <div className="sm:col-span-2">
@@ -145,6 +205,7 @@ export default async function DailyPage({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs text-slate-500">{l.log_date}</span>
                     {l.category && <Badge tone="blue">{l.category}</Badge>}
+                    {isOffPlan(l) && <Badge tone="amber">Off-plan</Badge>}
                     {l.department && <Badge>{l.department}</Badge>}
                     <Badge tone={l.status === "Completed" ? "green" : l.status === "In Progress" ? "amber" : "slate"}>
                       {l.status}

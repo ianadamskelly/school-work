@@ -95,47 +95,180 @@ export async function deleteDailyLog(formData: FormData) {
   revalidatePath("/");
 }
 
-// ---------- weekly summaries ----------
+// ---------- objectives (owned by line managers) ----------
+
+export async function createObjective(formData: FormData) {
+  const user = await requireUser();
+  if (user.role !== "manager" && user.role !== "admin") redirect("/");
+  const title = String(formData.get("title") ?? "").trim();
+  if (title) {
+    getDb()
+      .prepare("INSERT INTO objectives (manager_id, title, description) VALUES (?, ?, ?)")
+      .run(user.id, title, str(formData, "description"));
+  }
+  revalidatePath("/team/objectives");
+  redirect("/team/objectives");
+}
+
+export async function toggleObjective(formData: FormData) {
+  const user = await requireUser();
+  if (user.role !== "manager" && user.role !== "admin") redirect("/");
+  getDb()
+    .prepare("UPDATE objectives SET active = 1 - active WHERE id = ? AND manager_id = ?")
+    .run(Number(formData.get("id")), user.id);
+  revalidatePath("/team/objectives");
+  redirect("/team/objectives");
+}
+
+// ---------- monthly plans ----------
+
+export async function proposeMonthlyPlan(formData: FormData) {
+  const user = await requireUser();
+  const year = Number(formData.get("year"));
+  const month = Number(formData.get("month"));
+  const objectiveId = Number(formData.get("objective_id"));
+  const focusIds = formData.getAll("focus_ids").map(Number).filter(Boolean);
+  if (!objectiveId || focusIds.length === 0) {
+    redirect(`/monthly?error=plan&year=${year}&month=${month}`);
+  }
+  const db = getDb();
+
+  // The objective must come from this person's line manager (or themselves if they manage others).
+  const objective = db
+    .prepare("SELECT manager_id FROM objectives WHERE id = ? AND active = 1")
+    .get(objectiveId) as { manager_id: number } | undefined;
+  const allowedOwner = objective && (objective.manager_id === user.manager_id || objective.manager_id === user.id);
+  if (!allowedOwner) redirect(`/monthly?error=plan&year=${year}&month=${month}`);
+
+  const existing = db
+    .prepare("SELECT id, status FROM monthly_plans WHERE user_id = ? AND year = ? AND month = ?")
+    .get(user.id, year, month) as { id: number; status: string } | undefined;
+  if (existing?.status === "approved") redirect(`/monthly?year=${year}&month=${month}`);
+
+  const save = db.transaction(() => {
+    db.prepare(
+      `INSERT INTO monthly_plans (user_id, year, month, objective_id, status)
+       VALUES (?, ?, ?, ?, 'proposed')
+       ON CONFLICT (user_id, year, month) DO UPDATE SET
+         objective_id = excluded.objective_id, status = 'proposed', approved_by = NULL, approved_at = NULL`
+    ).run(user.id, year, month, objectiveId);
+    const plan = db
+      .prepare("SELECT id FROM monthly_plans WHERE user_id = ? AND year = ? AND month = ?")
+      .get(user.id, year, month) as { id: number };
+    db.prepare("DELETE FROM monthly_plan_focus WHERE plan_id = ?").run(plan.id);
+    const ins = db.prepare("INSERT OR IGNORE INTO monthly_plan_focus (plan_id, focus_area_id) VALUES (?, ?)");
+    for (const fid of focusIds) ins.run(plan.id, fid);
+  });
+  save();
+  revalidatePath("/monthly");
+  revalidatePath("/");
+  redirect(`/monthly?saved=plan&year=${year}&month=${month}`);
+}
+
+export async function approveMonthlyPlan(formData: FormData) {
+  const user = await requireUser();
+  const planId = Number(formData.get("plan_id"));
+  const db = getDb();
+  const plan = db
+    .prepare("SELECT id, user_id FROM monthly_plans WHERE id = ?")
+    .get(planId) as { id: number; user_id: number } | undefined;
+  if (!plan) redirect("/team");
+  const allowed = user.role === "admin" || (user.role === "manager" && isDirectReport(user.id, plan.user_id));
+  if (!allowed) redirect("/");
+  db.prepare(
+    "UPDATE monthly_plans SET status = 'approved', approved_by = ?, approved_at = datetime('now') WHERE id = ?"
+  ).run(user.id, planId);
+  revalidatePath("/team");
+  redirect(`/team/${plan.user_id}?approved=1`);
+}
+
+// ---------- weekly reports ----------
 
 export async function saveWeeklySummary(formData: FormData) {
   const user = await requireUser();
   const year = Number(formData.get("year"));
   const month = Number(formData.get("month"));
   const week = Number(formData.get("week_of_month"));
-  getDb()
-    .prepare(
-      `INSERT INTO weekly_summaries
-       (user_id, year, month, week_of_month, focus_area_id, tasks_completed, evidence,
-        challenges, solutions, people_engaged, impact, risk_level, next_week_plan)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT (user_id, year, month, week_of_month) DO UPDATE SET
-         focus_area_id = excluded.focus_area_id,
-         tasks_completed = excluded.tasks_completed,
-         evidence = excluded.evidence,
-         challenges = excluded.challenges,
-         solutions = excluded.solutions,
-         people_engaged = excluded.people_engaged,
-         impact = excluded.impact,
-         risk_level = excluded.risk_level,
-         next_week_plan = excluded.next_week_plan`
-    )
-    .run(
-      user.id,
-      year,
-      month,
-      week,
-      numOrNull(formData.get("focus_area_id")),
-      str(formData, "tasks_completed"),
-      str(formData, "evidence"),
-      str(formData, "challenges"),
-      str(formData, "solutions"),
-      str(formData, "people_engaged"),
-      str(formData, "impact"),
-      String(formData.get("risk_level") ?? "Low"),
-      str(formData, "next_week_plan")
-    );
+  const submit = formData.get("intent") === "submit";
+  const db = getDb();
+
+  // Focus areas must come from the approved monthly plan's pool.
+  const plan = db
+    .prepare("SELECT id, status FROM monthly_plans WHERE user_id = ? AND year = ? AND month = ?")
+    .get(user.id, year, month) as { id: number; status: string } | undefined;
+  if (!plan || plan.status !== "approved") {
+    redirect(`/weekly?error=noplan&year=${year}&month=${month}&week=${week}`);
+  }
+  const pool = new Set(
+    (db.prepare("SELECT focus_area_id FROM monthly_plan_focus WHERE plan_id = ?").all(plan.id) as
+      { focus_area_id: number }[]).map((r) => r.focus_area_id)
+  );
+  const focus1 = numOrNull(formData.get("focus_area_id"));
+  let focus2 = numOrNull(formData.get("focus_area_2_id"));
+  if (focus2 === focus1) focus2 = null;
+  if (!focus1 || !pool.has(focus1) || (focus2 !== null && !pool.has(focus2))) {
+    redirect(`/weekly?error=focus&year=${year}&month=${month}&week=${week}`);
+  }
+  const progress = Math.max(0, Math.min(100, Number(formData.get("progress_percent") ?? 0) || 0));
+
+  db.prepare(
+    `INSERT INTO weekly_summaries
+     (user_id, year, month, week_of_month, focus_area_id, focus_area_2_id, tasks_completed, evidence,
+      challenges, solutions, people_engaged, impact, risk_level, next_week_plan, progress_percent, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (user_id, year, month, week_of_month) DO UPDATE SET
+       focus_area_id = excluded.focus_area_id,
+       focus_area_2_id = excluded.focus_area_2_id,
+       tasks_completed = excluded.tasks_completed,
+       evidence = excluded.evidence,
+       challenges = excluded.challenges,
+       solutions = excluded.solutions,
+       people_engaged = excluded.people_engaged,
+       impact = excluded.impact,
+       risk_level = excluded.risk_level,
+       next_week_plan = excluded.next_week_plan,
+       progress_percent = excluded.progress_percent,
+       status = CASE WHEN weekly_summaries.status = 'seen' AND excluded.status = 'draft'
+                     THEN 'seen' ELSE excluded.status END`
+  ).run(
+    user.id,
+    year,
+    month,
+    week,
+    focus1,
+    focus2,
+    str(formData, "tasks_completed"),
+    str(formData, "evidence"),
+    str(formData, "challenges"),
+    str(formData, "solutions"),
+    str(formData, "people_engaged"),
+    str(formData, "impact"),
+    String(formData.get("risk_level") ?? "Low"),
+    str(formData, "next_week_plan"),
+    progress,
+    submit ? "submitted" : "draft"
+  );
   revalidatePath("/weekly");
+  revalidatePath("/daily");
+  revalidatePath("/");
   redirect(`/weekly?saved=1&year=${year}&month=${month}&week=${week}`);
+}
+
+export async function commentWeeklySummary(formData: FormData) {
+  const user = await requireUser();
+  const summaryId = Number(formData.get("summary_id"));
+  const db = getDb();
+  const summary = db
+    .prepare("SELECT id, user_id FROM weekly_summaries WHERE id = ?")
+    .get(summaryId) as { id: number; user_id: number } | undefined;
+  if (!summary) redirect("/team");
+  const allowed = user.role === "admin" || (user.role === "manager" && isDirectReport(user.id, summary.user_id));
+  if (!allowed) redirect("/");
+  db.prepare(
+    "UPDATE weekly_summaries SET manager_comment = ?, status = 'seen', seen_at = datetime('now') WHERE id = ?"
+  ).run(str(formData, "manager_comment"), summaryId);
+  revalidatePath("/team");
+  redirect(`/team/${summary.user_id}?commented=1`);
 }
 
 // ---------- monthly reviews ----------
@@ -156,11 +289,12 @@ export async function saveMonthlyReview(formData: FormData) {
   const save = db.transaction(() => {
     db.prepare(
       `INSERT INTO monthly_reviews
-       (user_id, year, month, strategic_objectives, key_achievements, outputs_delivered,
+       (user_id, year, month, strategic_objectives, objective_outcome, key_achievements, outputs_delivered,
         impact_summary, recommendations, pending_items, self_rating, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (user_id, year, month) DO UPDATE SET
          strategic_objectives = excluded.strategic_objectives,
+         objective_outcome = excluded.objective_outcome,
          key_achievements = excluded.key_achievements,
          outputs_delivered = excluded.outputs_delivered,
          impact_summary = excluded.impact_summary,
@@ -173,6 +307,7 @@ export async function saveMonthlyReview(formData: FormData) {
       year,
       month,
       str(formData, "strategic_objectives"),
+      str(formData, "objective_outcome"),
       str(formData, "key_achievements"),
       str(formData, "outputs_delivered"),
       str(formData, "impact_summary"),

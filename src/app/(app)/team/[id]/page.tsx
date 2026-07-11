@@ -1,17 +1,26 @@
 import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
-import { reviewMonthly } from "@/lib/actions";
+import { reviewMonthly, approveMonthlyPlan, commentWeeklySummary } from "@/lib/actions";
 import { todayISO, MONTH_NAMES } from "@/lib/rotation";
+import { getPlanFocusPool } from "@/lib/plan";
 import { Card, Field, PageHeader, Badge, SavedNotice, inputCls, btnPrimary } from "@/components/ui";
 
 type Person = { id: number; name: string; job_title: string; manager_id: number | null; template_id: number | null };
+type PlanRow = { id: number; year: number; month: number; status: string; objective_title: string };
 type LogRow = { id: number; log_date: string; activity: string; category: string | null; hours: number; status: string; followup_required: number; followup_date: string | null };
-type WeekRow = { id: number; year: number; month: number; week_of_month: number; focus_area: string | null; tasks_completed: string; challenges: string; risk_level: string };
+type WeekRow = {
+  id: number; year: number; month: number; week_of_month: number;
+  focus_1: string | null; focus_2: string | null;
+  tasks_completed: string; evidence: string; challenges: string; solutions: string;
+  impact: string; risk_level: string; next_week_plan: string;
+  progress_percent: number | null; status: string; manager_comment: string;
+};
 type ReviewRow = {
   id: number; year: number; month: number; status: string; self_rating: number | null;
+  strategic_objectives: string; objective_outcome: string;
   key_achievements: string; outputs_delivered: string; impact_summary: string;
-  recommendations: string; pending_items: string; strategic_objectives: string;
+  recommendations: string; pending_items: string;
   manager_rating: number | null; manager_comments: string;
 };
 
@@ -20,7 +29,7 @@ export default async function PersonPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ reviewed?: string }>;
+  searchParams: Promise<{ reviewed?: string; approved?: string; commented?: string }>;
 }) {
   const user = await requireSessionUser();
   if (user.role !== "manager" && user.role !== "admin") redirect("/");
@@ -35,18 +44,28 @@ export default async function PersonPage({
   if (user.role === "manager" && person.manager_id !== user.id) redirect("/team");
 
   const today = todayISO();
-  const logs = db
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+
+  const currentPlan = db
     .prepare(
-      `SELECT dl.id, dl.log_date, dl.activity, tc.name AS category, dl.hours, dl.status, dl.followup_required, dl.followup_date
-       FROM daily_logs dl LEFT JOIN task_categories tc ON tc.id = dl.category_id
-       WHERE dl.user_id = ? ORDER BY dl.log_date DESC, dl.id DESC LIMIT 15`
+      `SELECT mp.id, mp.year, mp.month, mp.status, o.title AS objective_title
+       FROM monthly_plans mp JOIN objectives o ON o.id = mp.objective_id
+       WHERE mp.user_id = ? AND mp.year = ? AND mp.month = ?`
     )
-    .all(person.id) as LogRow[];
+    .get(person.id, year, month) as PlanRow | undefined;
+  const planPool = currentPlan ? getPlanFocusPool(currentPlan.id) : [];
 
   const weeks = db
     .prepare(
-      `SELECT ws.id, ws.year, ws.month, ws.week_of_month, fa.name AS focus_area, ws.tasks_completed, ws.challenges, ws.risk_level
-       FROM weekly_summaries ws LEFT JOIN focus_areas fa ON fa.id = ws.focus_area_id
+      `SELECT ws.id, ws.year, ws.month, ws.week_of_month,
+              f1.name AS focus_1, f2.name AS focus_2,
+              ws.tasks_completed, ws.evidence, ws.challenges, ws.solutions, ws.impact,
+              ws.risk_level, ws.next_week_plan, ws.progress_percent, ws.status, ws.manager_comment
+       FROM weekly_summaries ws
+       LEFT JOIN focus_areas f1 ON f1.id = ws.focus_area_id
+       LEFT JOIN focus_areas f2 ON f2.id = ws.focus_area_2_id
        WHERE ws.user_id = ? ORDER BY ws.year DESC, ws.month DESC, ws.week_of_month DESC LIMIT 8`
     )
     .all(person.id) as WeekRow[];
@@ -64,13 +83,102 @@ export default async function PersonPage({
       )
       .all(reviewId) as { name: string; commentary: string }[];
 
+  const logs = db
+    .prepare(
+      `SELECT dl.id, dl.log_date, dl.activity, tc.name AS category, dl.hours, dl.status, dl.followup_required, dl.followup_date
+       FROM daily_logs dl LEFT JOIN task_categories tc ON tc.id = dl.category_id
+       WHERE dl.user_id = ? ORDER BY dl.log_date DESC, dl.id DESC LIMIT 15`
+    )
+    .all(person.id) as LogRow[];
+
   const isOverdue = (l: LogRow) =>
     l.followup_required === 1 && l.status !== "Completed" && !!l.followup_date && l.followup_date < today;
 
   return (
     <div className="space-y-6">
       <PageHeader title={person.name} subtitle={person.job_title || undefined} />
+      <SavedNotice show={query.approved === "1"} text="Plan approved — they can now plan their weeks against it." />
+      <SavedNotice show={query.commented === "1"} text="Comment saved — the weekly report is marked as seen." />
       <SavedNotice show={query.reviewed === "1"} text="Review saved — the staff member can now see your feedback." />
+
+      <Card title={`${MONTH_NAMES[month - 1]} plan`}>
+        {!currentPlan ? (
+          <p className="text-sm text-slate-500">No plan proposed for this month yet.</p>
+        ) : (
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={currentPlan.status === "approved" ? "green" : "amber"}>
+                {currentPlan.status === "approved" ? "Approved" : "Waiting for your approval"}
+              </Badge>
+            </div>
+            <p className="mt-2 font-semibold text-navy-800">{currentPlan.objective_title}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {planPool.map((f) => (
+                <Badge key={f.id} tone="blue">{f.name}</Badge>
+              ))}
+            </div>
+            {currentPlan.status === "proposed" && (
+              <form action={approveMonthlyPlan} className="mt-4">
+                <input type="hidden" name="plan_id" value={currentPlan.id} />
+                <button type="submit" className={btnPrimary}>Approve this plan</button>
+                <p className="mt-2 text-xs text-slate-500">
+                  Want something different? Talk to them — they can change and resubmit the plan until you approve it.
+                </p>
+              </form>
+            )}
+          </div>
+        )}
+      </Card>
+
+      <Card title="Weekly reports">
+        {weeks.length === 0 ? (
+          <p className="text-sm text-slate-500">No weekly reports yet.</p>
+        ) : (
+          <div className="space-y-4">
+            {weeks.map((w) => (
+              <div key={w.id} className="rounded-lg border border-slate-200 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-slate-800">
+                    {MONTH_NAMES[w.month - 1]} {w.year}, week {w.week_of_month}
+                  </span>
+                  {w.focus_1 && <Badge tone="blue">{w.focus_1}</Badge>}
+                  {w.focus_2 && <Badge tone="blue">{w.focus_2}</Badge>}
+                  <Badge tone={w.risk_level === "High" ? "red" : w.risk_level === "Medium" ? "amber" : "green"}>
+                    {w.risk_level} risk
+                  </Badge>
+                  {w.progress_percent != null && <Badge tone="green">{w.progress_percent}% progress</Badge>}
+                  <Badge tone={w.status === "seen" ? "green" : w.status === "submitted" ? "blue" : "slate"}>
+                    {w.status === "seen" ? "Seen" : w.status === "submitted" ? "New — needs reading" : "Draft"}
+                  </Badge>
+                </div>
+                {w.status !== "draft" && (
+                  <div className="mt-2 space-y-1 text-sm text-slate-700">
+                    {w.tasks_completed && <p><span className="font-medium">Done:</span> {w.tasks_completed}</p>}
+                    {w.evidence && <p><span className="font-medium">Evidence:</span> {w.evidence}</p>}
+                    {w.challenges && <p><span className="font-medium">Challenges:</span> {w.challenges}</p>}
+                    {w.solutions && <p><span className="font-medium">Solutions:</span> {w.solutions}</p>}
+                    {w.next_week_plan && <p><span className="font-medium">Next week:</span> {w.next_week_plan}</p>}
+                  </div>
+                )}
+                {w.status === "submitted" && (
+                  <form action={commentWeeklySummary} className="mt-3 flex flex-col gap-2 rounded-lg bg-navy-50 p-3 sm:flex-row">
+                    <input type="hidden" name="summary_id" value={w.id} />
+                    <input
+                      name="manager_comment"
+                      className={inputCls}
+                      placeholder="Optional comment — leaving it blank still marks the report as seen"
+                    />
+                    <button type="submit" className={`${btnPrimary} shrink-0`}>Mark as seen</button>
+                  </form>
+                )}
+                {w.status === "seen" && w.manager_comment && (
+                  <p className="mt-2 text-sm text-slate-600"><span className="font-medium">Your comment:</span> {w.manager_comment}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       <Card title="Monthly reviews">
         {reviews.length === 0 ? (
@@ -92,6 +200,12 @@ export default async function PersonPage({
 
                 {(r.status === "submitted" || r.status === "reviewed") && (
                   <div className="mt-3 space-y-2 text-sm text-slate-700">
+                    {r.strategic_objectives && (
+                      <p><span className="font-medium">Objective:</span> {r.strategic_objectives}</p>
+                    )}
+                    {r.objective_outcome && (
+                      <p><span className="font-medium">Outcome:</span> {r.objective_outcome}</p>
+                    )}
                     {r.key_achievements && <p><span className="font-medium">Achievements:</span> {r.key_achievements}</p>}
                     {torCommentaries(r.id).map((c) => (
                       <p key={c.name}><span className="font-medium">{c.name}:</span> {c.commentary}</p>
@@ -127,30 +241,6 @@ export default async function PersonPage({
               </div>
             ))}
           </div>
-        )}
-      </Card>
-
-      <Card title="Recent weekly summaries">
-        {weeks.length === 0 ? (
-          <p className="text-sm text-slate-500">No weekly summaries yet.</p>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {weeks.map((w) => (
-              <li key={w.id} className="py-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium text-slate-800">
-                    {MONTH_NAMES[w.month - 1]} {w.year}, week {w.week_of_month}
-                  </span>
-                  {w.focus_area && <Badge tone="blue">{w.focus_area}</Badge>}
-                  <Badge tone={w.risk_level === "High" ? "red" : w.risk_level === "Medium" ? "amber" : "green"}>
-                    {w.risk_level} risk
-                  </Badge>
-                </div>
-                {w.tasks_completed && <p className="mt-1 text-sm text-slate-600">{w.tasks_completed}</p>}
-                {w.challenges && <p className="text-sm text-slate-500">Challenges: {w.challenges}</p>}
-              </li>
-            ))}
-          </ul>
         )}
       </Card>
 
