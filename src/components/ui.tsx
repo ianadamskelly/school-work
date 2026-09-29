@@ -1,18 +1,18 @@
 import { ReactNode } from "react";
 
 export const inputCls =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-navy-600 focus:outline-none focus:ring-1 focus:ring-navy-600";
+  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100";
 
 export const btnPrimary =
-  "inline-flex items-center justify-center rounded-lg bg-navy-700 px-4 py-2 text-sm font-medium text-white hover:bg-navy-800 focus:outline-none focus:ring-2 focus:ring-navy-600 focus:ring-offset-1 cursor-pointer";
+  "inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 cursor-pointer";
 
 export const btnSecondary =
-  "inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 cursor-pointer";
+  "inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 cursor-pointer";
 
 export function Card({ title, children, className = "" }: { title?: string; children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>
-      {title && <h2 className="mb-4 text-base font-semibold text-slate-800">{title}</h2>}
+    <div className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] ${className}`}>
+      {title && <h2 className="mb-4 text-lg font-semibold tracking-tight text-slate-900">{title}</h2>}
       {children}
     </div>
   );
@@ -31,8 +31,8 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="mb-6">
-      <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
-      {subtitle && <p className="mt-1 text-sm text-slate-600">{subtitle}</p>}
+      <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">{title}</h1>
+      {subtitle && <p className="mt-2 text-base text-slate-500">{subtitle}</p>}
     </div>
   );
 }
