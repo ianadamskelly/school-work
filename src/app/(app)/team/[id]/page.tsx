@@ -1,13 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
-import { reviewMonthly, approveMonthlyPlan, commentWeeklySummary } from "@/lib/actions";
+import { reviewMonthly, approveMonthlyPlan, requestMonthlyPlanChanges, commentWeeklySummary } from "@/lib/actions";
 import { todayISO, MONTH_NAMES } from "@/lib/rotation";
-import { getPlanFocusPool } from "@/lib/plan";
+import { getPlanFocusPool, getPlanObjectives } from "@/lib/plan";
 import { Card, Field, PageHeader, Badge, SavedNotice, inputCls, btnPrimary } from "@/components/ui";
 
 type Person = { id: number; name: string; job_title: string; manager_id: number | null; template_id: number | null };
-type PlanRow = { id: number; year: number; month: number; status: string; objective_title: string };
+type PlanRow = { id: number; year: number; month: number; status: string; manager_feedback: string };
 type LogRow = { id: number; log_date: string; activity: string; category: string | null; hours: number; status: string; followup_required: number; followup_date: string | null };
 type WeekRow = {
   id: number; year: number; month: number; week_of_month: number;
@@ -29,7 +29,7 @@ export default async function PersonPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ reviewed?: string; approved?: string; commented?: string }>;
+  searchParams: Promise<{ reviewed?: string; approved?: string; commented?: string; feedback?: string }>;
 }) {
   const user = await requireSessionUser();
   if (user.role !== "manager" && user.role !== "admin") redirect("/");
@@ -50,12 +50,13 @@ export default async function PersonPage({
 
   const currentPlan = db
     .prepare(
-      `SELECT mp.id, mp.year, mp.month, mp.status, o.title AS objective_title
-       FROM monthly_plans mp JOIN objectives o ON o.id = mp.objective_id
+      `SELECT mp.id, mp.year, mp.month, mp.status, mp.manager_feedback
+       FROM monthly_plans mp
        WHERE mp.user_id = ? AND mp.year = ? AND mp.month = ?`
     )
     .get(person.id, year, month) as PlanRow | undefined;
   const planPool = currentPlan ? getPlanFocusPool(currentPlan.id) : [];
+  const planObjectives = currentPlan ? getPlanObjectives(currentPlan.id) : [];
 
   const weeks = db
     .prepare(
@@ -98,6 +99,7 @@ export default async function PersonPage({
     <div className="space-y-6">
       <PageHeader title={person.name} subtitle={person.job_title || undefined} />
       <SavedNotice show={query.approved === "1"} text="Plan approved — they can now plan their weeks against it." />
+      <SavedNotice show={query.feedback === "1"} text="Feedback sent — they can revise and resubmit their plan." />
       <SavedNotice show={query.commented === "1"} text="Comment saved — the weekly report is marked as seen." />
       <SavedNotice show={query.reviewed === "1"} text="Review saved — the staff member can now see your feedback." />
 
@@ -111,20 +113,30 @@ export default async function PersonPage({
                 {currentPlan.status === "approved" ? "Approved" : "Waiting for your approval"}
               </Badge>
             </div>
-            <p className="mt-2 font-semibold text-navy-800">{currentPlan.objective_title}</p>
+            <div className="mt-2 space-y-1">
+              {planObjectives.map((objective) => <p key={objective.id} className="font-semibold text-navy-800">{objective.title}</p>)}
+            </div>
             <div className="mt-2 flex flex-wrap gap-2">
               {planPool.map((f) => (
                 <Badge key={f.id} tone="blue">{f.name}</Badge>
               ))}
             </div>
             {currentPlan.status === "proposed" && (
-              <form action={approveMonthlyPlan} className="mt-4">
-                <input type="hidden" name="plan_id" value={currentPlan.id} />
-                <button type="submit" className={btnPrimary}>Approve this plan</button>
-                <p className="mt-2 text-xs text-slate-500">
-                  Want something different? Talk to them — they can change and resubmit the plan until you approve it.
-                </p>
-              </form>
+              <div className="mt-4 space-y-3">
+                <form action={approveMonthlyPlan}>
+                  <input type="hidden" name="plan_id" value={currentPlan.id} />
+                  <button type="submit" className={btnPrimary}>Approve this plan</button>
+                </form>
+                <form action={requestMonthlyPlanChanges} className="rounded-lg bg-amber-50 p-3">
+                  <input type="hidden" name="plan_id" value={currentPlan.id} />
+                  <Field label="Feedback for revision">
+                    <textarea name="manager_feedback" required rows={2} className={inputCls} placeholder="Explain what should change before approval" />
+                  </Field>
+                  <button type="submit" className="mt-2 rounded-lg border border-amber-300 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100 cursor-pointer">
+                    Send feedback for revision
+                  </button>
+                </form>
+              </div>
             )}
           </div>
         )}

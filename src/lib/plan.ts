@@ -3,22 +3,31 @@ import { getDb } from "./db";
 export type MonthlyPlan = {
   id: number;
   status: "proposed" | "approved";
-  objective_id: number;
-  objective_title: string;
-  objective_description: string;
+  manager_feedback: string;
 };
 
 export type WeekFocus = { id: number; name: string };
+export type MonthlyObjective = { id: number; title: string; description: string };
 
 export function getMonthlyPlan(userId: number, year: number, month: number): MonthlyPlan | null {
   const row = getDb()
     .prepare(
-      `SELECT mp.id, mp.status, mp.objective_id, o.title AS objective_title, o.description AS objective_description
-       FROM monthly_plans mp JOIN objectives o ON o.id = mp.objective_id
+      `SELECT mp.id, mp.status, mp.manager_feedback
+       FROM monthly_plans mp
        WHERE mp.user_id = ? AND mp.year = ? AND mp.month = ?`
     )
     .get(userId, year, month) as MonthlyPlan | undefined;
   return row ?? null;
+}
+
+export function getPlanObjectives(planId: number): MonthlyObjective[] {
+  return getDb()
+    .prepare(
+      `SELECT o.id, o.title, o.description FROM monthly_plan_objectives mpo
+       JOIN objectives o ON o.id = mpo.objective_id
+       WHERE mpo.plan_id = ? ORDER BY o.title`
+    )
+    .all(planId) as MonthlyObjective[];
 }
 
 export function getPlanFocusPool(planId: number): WeekFocus[] {

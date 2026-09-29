@@ -3,10 +3,11 @@ import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
 import { saveWeeklySummary } from "@/lib/actions";
 import { weekOfMonth, MONTH_NAMES } from "@/lib/rotation";
-import { getMonthlyPlan, getPlanFocusPool } from "@/lib/plan";
+import { getMonthlyPlan, getPlanFocusPool, getPlanObjectives } from "@/lib/plan";
 import { Card, Field, PageHeader, Badge, SavedNotice, inputCls, btnPrimary, btnSecondary } from "@/components/ui";
 
 type Summary = {
+  id: number;
   focus_area_id: number | null;
   focus_area_2_id: number | null;
   tasks_completed: string;
@@ -21,6 +22,7 @@ type Summary = {
   status: string;
   manager_comment: string;
 };
+type DailyEvidence = { id: number; log_date: string; activity: string; outcome: string; hours: number; status: string; category: string | null };
 
 export default async function WeeklyPage({
   searchParams,
@@ -38,6 +40,7 @@ export default async function WeeklyPage({
 
   const plan = getMonthlyPlan(user.id, year, month);
   const pool = plan && plan.status === "approved" ? getPlanFocusPool(plan.id) : [];
+  const objectives = plan ? getPlanObjectives(plan.id) : [];
 
   const existing = db
     .prepare("SELECT * FROM weekly_summaries WHERE user_id = ? AND year = ? AND month = ? AND week_of_month = ?")
@@ -46,12 +49,28 @@ export default async function WeeklyPage({
   const weekRows = db
     .prepare("SELECT week_of_month, status FROM weekly_summaries WHERE user_id = ? AND year = ? AND month = ?")
     .all(user.id, year, month) as { week_of_month: number; status: string }[];
+  const existingObjectiveProgress = existing
+    ? new Map(
+        (db.prepare("SELECT objective_id, progress_percent FROM weekly_objective_progress WHERE summary_id = ?").all(existing.id) as
+          { objective_id: number; progress_percent: number }[]).map((row) => [row.objective_id, row.progress_percent])
+      )
+    : new Map<number, number>();
+  const weekStart = `${year}-${String(month).padStart(2, "0")}-${String((week - 1) * 7 + 1).padStart(2, "0")}`;
+  const weekEnd = week === 4 ? `${year}-${String(month).padStart(2, "0")}-31` : null;
+  const dailyEvidence = db
+    .prepare(
+      `SELECT dl.id, dl.log_date, dl.activity, dl.outcome, dl.hours, dl.status, tc.name AS category
+       FROM daily_logs dl LEFT JOIN task_categories tc ON tc.id = dl.category_id
+       WHERE dl.user_id = ? AND dl.log_date >= ? AND dl.log_date ${weekEnd ? "<= ?" : "< date(?, '+7 days')"}
+       ORDER BY dl.log_date, dl.id`
+    )
+    .all(user.id, weekStart, weekEnd ?? weekStart) as DailyEvidence[];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="My week"
-        subtitle="Pick up to two focus areas from your monthly plan, then report the week to your line manager."
+        subtitle="Compile your daily work into a focused weekly report, then show progress against each approved objective."
       />
       <SavedNotice show={params.saved === "1"} text="Your weekly report has been saved." />
       {params.error === "focus" && (
@@ -98,7 +117,7 @@ export default async function WeeklyPage({
         <Card title="Plan the month first">
           <p className="text-sm text-slate-600">
             {!plan
-              ? "You have not set a strategic objective for this month yet. The weekly report follows the monthly plan."
+              ? "You have not set strategic objectives for this month yet. The weekly report follows the monthly plan."
               : "Your monthly plan is waiting for your manager's approval. Once approved, you can plan and report your weeks."}
           </p>
           <Link href={`/monthly?year=${year}&month=${month}`} className={`${btnPrimary} mt-4`}>
@@ -108,8 +127,10 @@ export default async function WeeklyPage({
       ) : (
         <>
           <Card>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">This month&apos;s objective</p>
-            <p className="mt-1 font-semibold text-navy-800">{plan.objective_title}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">This month&apos;s approved objectives</p>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {objectives.map((objective) => <Badge key={objective.id} tone="blue">{objective.title}</Badge>)}
+            </div>
           </Card>
 
           {existing?.status === "seen" && (
@@ -132,6 +153,27 @@ export default async function WeeklyPage({
                 </Badge>
               </div>
             )}
+            <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-slate-800">Daily work to compile</p>
+              {dailyEvidence.length === 0 ? (
+                <p className="mt-1 text-sm text-slate-500">No daily entries for this week yet. You can still write the report, but logging work first makes the summary more reliable.</p>
+              ) : (
+                <ul className="mt-3 divide-y divide-slate-200">
+                  {dailyEvidence.map((entry) => (
+                    <li key={entry.id} className="py-2 text-sm text-slate-700">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-slate-500">{entry.log_date}</span>
+                        {entry.category && <Badge tone="blue">{entry.category}</Badge>}
+                        <Badge tone={entry.status === "Completed" ? "green" : "amber"}>{entry.status}</Badge>
+                        <span className="text-xs text-slate-500">{entry.hours} h</span>
+                      </div>
+                      <p className="mt-1">{entry.activity}</p>
+                      {entry.outcome && <p className="mt-1 text-slate-500">{entry.outcome}</p>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <form action={saveWeeklySummary} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <input type="hidden" name="year" value={year} />
               <input type="hidden" name="month" value={month} />
@@ -181,17 +223,21 @@ export default async function WeeklyPage({
               <Field label="Impact summary">
                 <input name="impact" defaultValue={existing?.impact} className={inputCls} />
               </Field>
-              <Field label="Objective progress (%)" hint="Your honest estimate of how far the monthly objective has come, 0–100.">
-                <input
-                  name="progress_percent"
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={5}
-                  defaultValue={existing?.progress_percent ?? ""}
-                  className={inputCls}
-                />
-              </Field>
+              <div className="sm:col-span-2 rounded-lg border border-navy-100 bg-navy-50 p-4">
+                <p className="text-sm font-semibold text-navy-800">Progress toward each objective</p>
+                <p className="mt-1 text-xs text-slate-600">Use the daily work above as evidence. The monthly view will show the latest percentage for every objective.</p>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {objectives.map((objective) => (
+                    <Field key={objective.id} label={objective.title}>
+                      <div className="flex items-center gap-2">
+                        <input name={`objective_progress_${objective.id}`} type="number" min={0} max={100} step={5}
+                          defaultValue={existingObjectiveProgress.get(objective.id) ?? ""} className={inputCls} />
+                        <span className="text-sm text-slate-500">%</span>
+                      </div>
+                    </Field>
+                  ))}
+                </div>
+              </div>
               <div className="sm:col-span-2">
                 <Field label="Plan for next week">
                   <textarea name="next_week_plan" rows={2} defaultValue={existing?.next_week_plan} className={inputCls} />

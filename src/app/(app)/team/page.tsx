@@ -38,7 +38,9 @@ export default async function TeamPage() {
   const members = db
     .prepare(
       `SELECT u.id, u.name, u.job_title, m.name AS manager_name,
-        (SELECT o.title FROM monthly_plans mp JOIN objectives o ON o.id = mp.objective_id
+        (SELECT group_concat(o.title, ' · ') FROM monthly_plans mp
+           JOIN monthly_plan_objectives mpo ON mpo.plan_id = mp.id
+           JOIN objectives o ON o.id = mpo.objective_id
            WHERE mp.user_id = u.id AND mp.year = ? AND mp.month = ?) AS objective_title,
         (SELECT mp.status FROM monthly_plans mp
            WHERE mp.user_id = u.id AND mp.year = ? AND mp.month = ?) AS plan_status,

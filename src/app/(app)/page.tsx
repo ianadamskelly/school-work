@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
 import { weekOfMonth, todayISO, MONTH_NAMES } from "@/lib/rotation";
-import { getMonthlyPlan, getWeekFocus } from "@/lib/plan";
+import { getMonthlyPlan, getPlanObjectives, getWeekFocus } from "@/lib/plan";
 import { Card, Badge, btnPrimary } from "@/components/ui";
 
 export default async function HomePage() {
@@ -15,6 +15,7 @@ export default async function HomePage() {
   const week = weekOfMonth(now);
 
   const plan = user.template_id ? getMonthlyPlan(user.id, year, month) : null;
+  const planObjectives = plan ? getPlanObjectives(plan.id) : [];
   const weekFocus = plan?.status === "approved" ? getWeekFocus(user.id, year, month, week) : [];
 
   const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
@@ -95,7 +96,9 @@ export default async function HomePage() {
                 {plan.status === "approved" ? "Approved" : "Waiting for approval"}
               </Badge>
             </div>
-            <p className="mt-1 text-lg font-semibold text-navy-800">{plan.objective_title}</p>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {planObjectives.map((objective) => <Badge key={objective.id} tone="blue">{objective.title}</Badge>)}
+            </div>
             {plan.status === "approved" && (
               <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap items-center gap-2">

@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
 import { addDailyLog, setDailyStatus, deleteDailyLog } from "@/lib/actions";
 import { weekOfMonth, todayISO } from "@/lib/rotation";
-import { getMonthlyPlan, getWeekFocus } from "@/lib/plan";
+import { getMonthlyPlan, getPlanObjectives, getWeekFocus } from "@/lib/plan";
 import { Card, Field, PageHeader, Badge, SavedNotice, inputCls, btnPrimary } from "@/components/ui";
 
 type Option = { id: number; name: string };
@@ -47,6 +47,7 @@ export default async function DailyPage({
     : [];
 
   const plan = getMonthlyPlan(user.id, year, month);
+  const planObjectives = plan ? getPlanObjectives(plan.id) : [];
   const weekFocus = getWeekFocus(user.id, year, month, week);
   const focusIds = new Set(weekFocus.map((f) => f.id));
   const onFocus = categories.filter((c) => c.focus_area_id !== null && focusIds.has(c.focus_area_id));
@@ -100,7 +101,7 @@ export default async function DailyPage({
             {weekFocus.map((f) => (
               <Badge key={f.id} tone="blue">{f.name}</Badge>
             ))}
-            {plan && <span className="text-xs text-slate-500">serving: {plan.objective_title}</span>}
+            {planObjectives.length > 0 && <span className="text-xs text-slate-500">serving: {planObjectives.map((objective) => objective.title).join(" · ")}</span>}
           </div>
         </Card>
       ) : (

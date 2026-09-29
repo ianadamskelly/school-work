@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
 import { saveMonthlyReview, proposeMonthlyPlan } from "@/lib/actions";
 import { MONTH_NAMES } from "@/lib/rotation";
-import { getMonthlyPlan, getPlanFocusPool } from "@/lib/plan";
+import { getMonthlyPlan, getPlanFocusPool, getPlanObjectives } from "@/lib/plan";
 import { Card, Field, PageHeader, Badge, SavedNotice, inputCls, btnPrimary, btnSecondary } from "@/components/ui";
 
 type TorArea = { id: number; name: string };
@@ -38,6 +38,7 @@ export default async function MonthlyPage({
 
   const plan = getMonthlyPlan(user.id, year, month);
   const pool = plan ? getPlanFocusPool(plan.id) : [];
+  const planObjectives = plan ? getPlanObjectives(plan.id) : [];
 
   // Objectives this person may pick from: their line manager's list (or their own if they manage).
   const objectives = db
@@ -84,6 +85,22 @@ export default async function MonthlyPage({
     )
     .all(user.id, year, month) as { week_of_month: number; status: string; progress_percent: number | null }[];
   const latestProgress = [...weekReports].reverse().find((w) => w.progress_percent !== null)?.progress_percent;
+  const objectiveProgress = plan
+    ? (db
+        .prepare(
+          `SELECT o.id, o.title, wop.progress_percent
+           FROM monthly_plan_objectives mpo
+           JOIN objectives o ON o.id = mpo.objective_id
+           LEFT JOIN weekly_objective_progress wop ON wop.objective_id = o.id
+             AND wop.summary_id = (
+               SELECT ws.id FROM weekly_summaries ws
+               WHERE ws.user_id = ? AND ws.year = ? AND ws.month = ?
+               ORDER BY ws.week_of_month DESC LIMIT 1
+             )
+           WHERE mpo.plan_id = ? ORDER BY o.title`
+        )
+        .all(user.id, year, month, plan.id) as { id: number; title: string; progress_percent: number | null }[])
+    : [];
 
   const locked = review?.status === "reviewed";
   const prev = month === 1 ? { y: year - 1, m: 12 } : { y: year, m: month - 1 };
@@ -93,7 +110,7 @@ export default async function MonthlyPage({
     <div className="space-y-6">
       <PageHeader
         title="My month"
-        subtitle="Plan the month first: pick the strategic objective everything will feed. At the end of the month, report on how far it got."
+        subtitle="Plan the month around complementary strategic objectives, then track how daily work advances each one."
       />
       <SavedNotice show={params.saved === "plan"} text="Your plan has been sent to your line manager for approval." />
       <SavedNotice show={params.saved === "1"} text="Your monthly report has been saved." />
@@ -119,9 +136,21 @@ export default async function MonthlyPage({
               {plan.status === "approved" ? "Approved by your manager" : "Waiting for manager approval"}
             </Badge>
           </div>
-          <p className="mt-3 text-base font-semibold text-navy-800">{plan.objective_title}</p>
-          {plan.objective_description && <p className="mt-1 text-sm text-slate-600">{plan.objective_description}</p>}
-          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">Focus areas serving this objective</p>
+          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">Approved objectives</p>
+          <div className="mt-2 space-y-2">
+            {planObjectives.map((objective) => (
+              <div key={objective.id}>
+                <p className="font-semibold text-navy-800">{objective.title}</p>
+                {objective.description && <p className="text-sm text-slate-600">{objective.description}</p>}
+              </div>
+            ))}
+          </div>
+          {plan.status === "proposed" && plan.manager_feedback && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <span className="font-medium">Your manager&apos;s feedback:</span> {plan.manager_feedback}
+            </div>
+          )}
+          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">Focus areas serving these objectives</p>
           <div className="mt-1 flex flex-wrap gap-2">
             {pool.map((f) => (
               <Badge key={f.id} tone="blue">{f.name}</Badge>
@@ -129,14 +158,14 @@ export default async function MonthlyPage({
           </div>
           {plan.status === "proposed" && (
             <p className="mt-3 text-sm text-slate-500">
-              You can change the plan until it is approved — resubmitting below replaces it.
+              You can revise the objectives, focus areas, and resubmit. Resubmitting clears the feedback and sends the updated plan back for approval.
             </p>
           )}
         </Card>
       ) : (
         <Card title="Set your plan for this month">
           <p className="mb-4 text-sm text-slate-600">
-            Choose the strategic objective your work this month will feed, and tick the focus areas that serve it.
+            Choose one or more complementary objectives your work this month will feed, and tick the focus areas that serve them.
             Your line manager will approve the plan.
           </p>
         </Card>
@@ -152,14 +181,18 @@ export default async function MonthlyPage({
             <form action={proposeMonthlyPlan} className="space-y-4">
               <input type="hidden" name="year" value={year} />
               <input type="hidden" name="month" value={month} />
-              <Field label="Strategic objective">
-                <select name="objective_id" required defaultValue={plan?.objective_id ?? ""} className={inputCls}>
-                  <option value="" disabled>— Choose —</option>
+              <div>
+                <p className="mb-2 text-sm font-medium text-slate-700">Strategic objectives</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {objectives.map((o) => (
-                    <option key={o.id} value={o.id}>{o.title}</option>
+                    <label key={o.id} className="flex items-start gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                      <input type="checkbox" name="objective_ids" value={o.id}
+                        defaultChecked={planObjectives.some((selected) => selected.id === o.id)} className="mt-0.5 h-4 w-4 rounded border-slate-300" />
+                      <span><span className="font-medium">{o.title}</span>{o.description && <span className="mt-0.5 block text-xs text-slate-500">{o.description}</span>}</span>
+                    </label>
                   ))}
-                </select>
-              </Field>
+                </div>
+              </div>
               <div>
                 <p className="mb-2 text-sm font-medium text-slate-700">Focus areas that will serve it this month</p>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -213,6 +246,16 @@ export default async function MonthlyPage({
                 );
               })}
             </div>
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {objectiveProgress.map((objective) => (
+                <div key={objective.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                  <p className="text-sm font-medium text-slate-800">{objective.title}</p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {objective.progress_percent == null ? "No progress estimate yet" : `${objective.progress_percent}% progress`}
+                  </p>
+                </div>
+              ))}
+            </div>
           </Card>
 
           {locked && review && (
@@ -237,11 +280,11 @@ export default async function MonthlyPage({
             <form action={saveMonthlyReview} className="space-y-4">
               <input type="hidden" name="year" value={year} />
               <input type="hidden" name="month" value={month} />
-              <input type="hidden" name="strategic_objectives" value={plan.objective_title} />
+              <input type="hidden" name="strategic_objectives" value={planObjectives.map((objective) => objective.title).join("; ")} />
               <fieldset disabled={locked} className="space-y-4 disabled:opacity-70">
                 <Field
-                  label={`Did you meet the objective: "${plan.objective_title}"?`}
-                  hint="What was achieved against it, what remains, and what you learned."
+                  label="What was achieved across this month’s objectives?"
+                  hint="Use the objective progress figures above, then explain what was achieved, what remains, and what you learned."
                 >
                   <textarea name="objective_outcome" rows={3} defaultValue={review?.objective_outcome} className={inputCls} />
                 </Field>

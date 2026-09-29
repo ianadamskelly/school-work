@@ -36,6 +36,14 @@ function upgrade(db: Database.Database) {
   add("weekly_summaries", "manager_comment", "manager_comment TEXT NOT NULL DEFAULT ''");
   add("weekly_summaries", "seen_at", "seen_at TEXT");
   add("monthly_reviews", "objective_outcome", "objective_outcome TEXT NOT NULL DEFAULT ''");
+  add("monthly_plans", "manager_feedback", "manager_feedback TEXT NOT NULL DEFAULT ''");
+
+  // Preserve every existing single-objective plan as a member of the new
+  // multi-objective plan structure.
+  db.exec(`
+    INSERT OR IGNORE INTO monthly_plan_objectives (plan_id, objective_id)
+    SELECT id, objective_id FROM monthly_plans;
+  `);
 }
 
 function migrate(db: Database.Database) {
@@ -181,6 +189,19 @@ function migrate(db: Database.Database) {
       plan_id INTEGER NOT NULL REFERENCES monthly_plans(id) ON DELETE CASCADE,
       focus_area_id INTEGER NOT NULL REFERENCES focus_areas(id) ON DELETE CASCADE,
       UNIQUE (plan_id, focus_area_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS monthly_plan_objectives (
+      plan_id INTEGER NOT NULL REFERENCES monthly_plans(id) ON DELETE CASCADE,
+      objective_id INTEGER NOT NULL REFERENCES objectives(id),
+      PRIMARY KEY (plan_id, objective_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS weekly_objective_progress (
+      summary_id INTEGER NOT NULL REFERENCES weekly_summaries(id) ON DELETE CASCADE,
+      objective_id INTEGER NOT NULL REFERENCES objectives(id),
+      progress_percent INTEGER NOT NULL CHECK (progress_percent BETWEEN 0 AND 100),
+      PRIMARY KEY (summary_id, objective_id)
     );
   `);
   upgrade(db);
