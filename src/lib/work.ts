@@ -71,7 +71,7 @@ export function weeklyDraft(userId: number, year: number, month: number, week: n
   const end = week === 4 ? `${monthStart(year, month).slice(0, -2)}31` : null;
   const rows = db
     .prepare(
-      `SELECT wu.id, wu.text AS update, wu.update_date AS date, wi.title, wi.status, wi.work_type,
+      `SELECT wu.id, wu.text AS update_text, wu.update_date AS date, wi.title, wi.status, wi.work_type,
               COALESCE(mo.title, o.title) AS objective_title
        FROM work_updates wu
        LEFT JOIN work_items wi ON wi.id = wu.work_item_id
@@ -81,7 +81,7 @@ export function weeklyDraft(userId: number, year: number, month: number, week: n
        ORDER BY wu.update_date, wu.id`
     )
     .all(userId, start, end ?? start) as {
-      id: number; update: string; date: string; title: string | null; status: string | null; work_type: WorkType | null; objective_title: string | null;
+      id: number; update_text: string; date: string; title: string | null; status: string | null; work_type: WorkType | null; objective_title: string | null;
     }[];
 
   const groups = new Map<string, WeeklyDraftSection>();
@@ -90,7 +90,7 @@ export function weeklyDraft(userId: number, year: number, month: number, week: n
     const title = row.objective_title ?? (kind === "recurring" ? "Recurring responsibilities" : kind === "reactive" ? "Reactive / unplanned work" : "Other recorded work");
     const key = `${kind}:${title}`;
     if (!groups.has(key)) groups.set(key, { title, kind, items: [] });
-    groups.get(key)!.items.push({ id: row.id, title: row.title ?? "Unlinked update", status: row.status, update: row.update, date: row.date });
+    groups.get(key)!.items.push({ id: row.id, title: row.title ?? "Unlinked update", status: row.status, update: row.update_text, date: row.date });
   }
   return [...groups.values()];
 }
