@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
-import { saveMonthlyReview, proposeMonthlyPlan } from "@/lib/actions";
+import { addMonthlyFocusArea, addMonthlyWorkObjective, saveMonthlyReview, submitMonthlyWorkPlan } from "@/lib/actions";
 import { MONTH_NAMES } from "@/lib/rotation";
-import { getMonthlyPlan, getPlanFocusPool, getPlanObjectives } from "@/lib/plan";
+import { getMonthlyPlan } from "@/lib/plan";
+import { getMonthlyWorkObjectives } from "@/lib/planning";
 import { Card, Field, PageHeader, Badge, SavedNotice, inputCls, btnPrimary, btnSecondary } from "@/components/ui";
 
 type TorArea = { id: number; name: string };
@@ -37,8 +38,7 @@ export default async function MonthlyPage({
   const month = Number(params.month) || now.getMonth() + 1;
 
   const plan = getMonthlyPlan(user.id, year, month);
-  const pool = plan ? getPlanFocusPool(plan.id) : [];
-  const planObjectives = plan ? getPlanObjectives(plan.id) : [];
+  const workObjectives = plan ? getMonthlyWorkObjectives(plan.id) : [];
 
   // Objectives this person may pick from: their line manager's list (or their own if they manage).
   const objectives = db
@@ -46,11 +46,6 @@ export default async function MonthlyPage({
       "SELECT id, title, description FROM objectives WHERE active = 1 AND (manager_id = ? OR manager_id = ?) ORDER BY title"
     )
     .all(user.manager_id ?? -1, user.id) as Objective[];
-
-  const focusAreas = user.template_id
-    ? (db.prepare("SELECT id, name FROM focus_areas WHERE template_id = ? ORDER BY sort").all(user.template_id) as
-        { id: number; name: string }[])
-    : [];
 
   const torAreas = user.template_id
     ? (db.prepare("SELECT id, name FROM tor_areas WHERE template_id = ? ORDER BY sort").all(user.template_id) as TorArea[])
@@ -68,40 +63,30 @@ export default async function MonthlyPage({
     rows.forEach((r) => commentaries.set(r.tor_area_id, r.commentary));
   }
 
-  // Evidence assembled from the month's activity, to write the report against.
+  // The review is built from the same work updates used by the weekly draft.
   const monthStats = db
     .prepare(
-      `SELECT COUNT(*) AS entries, COALESCE(SUM(hours),0) AS hours
-       FROM daily_logs WHERE user_id = ? AND log_date >= ? AND log_date <= ?`
+      `SELECT
+        (SELECT COUNT(*) FROM work_updates WHERE user_id = ? AND update_date >= ? AND update_date <= ?) AS entries,
+        (SELECT COUNT(*) FROM work_items WHERE user_id = ? AND created_at >= ? AND created_at <= datetime(?, '+1 day')) AS work_items,
+        (SELECT COUNT(*) FROM work_items WHERE user_id = ? AND status = 'completed' AND completed_at >= ? AND completed_at <= datetime(?, '+1 day')) AS completed`
     )
     .get(
       user.id,
       `${year}-${String(month).padStart(2, "0")}-01`,
+      `${year}-${String(month).padStart(2, "0")}-31`,
+      user.id,
+      `${year}-${String(month).padStart(2, "0")}-01`,
+      `${year}-${String(month).padStart(2, "0")}-31`,
+      user.id,
+      `${year}-${String(month).padStart(2, "0")}-01`,
       `${year}-${String(month).padStart(2, "0")}-31`
-    ) as { entries: number; hours: number };
+    ) as { entries: number; work_items: number; completed: number };
   const weekReports = db
     .prepare(
       "SELECT week_of_month, status, progress_percent FROM weekly_summaries WHERE user_id = ? AND year = ? AND month = ? ORDER BY week_of_month"
     )
     .all(user.id, year, month) as { week_of_month: number; status: string; progress_percent: number | null }[];
-  const latestProgress = [...weekReports].reverse().find((w) => w.progress_percent !== null)?.progress_percent;
-  const objectiveProgress = plan
-    ? (db
-        .prepare(
-          `SELECT o.id, o.title, wop.progress_percent
-           FROM monthly_plan_objectives mpo
-           JOIN objectives o ON o.id = mpo.objective_id
-           LEFT JOIN weekly_objective_progress wop ON wop.objective_id = o.id
-             AND wop.summary_id = (
-               SELECT ws.id FROM weekly_summaries ws
-               WHERE ws.user_id = ? AND ws.year = ? AND ws.month = ?
-               ORDER BY ws.week_of_month DESC LIMIT 1
-             )
-           WHERE mpo.plan_id = ? ORDER BY o.title`
-        )
-        .all(user.id, year, month, plan.id) as { id: number; title: string; progress_percent: number | null }[])
-    : [];
-
   const locked = review?.status === "reviewed";
   const prev = month === 1 ? { y: year - 1, m: 12 } : { y: year, m: month - 1 };
   const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
@@ -114,9 +99,9 @@ export default async function MonthlyPage({
       />
       <SavedNotice show={params.saved === "plan"} text="Your plan has been sent to your line manager for approval." />
       <SavedNotice show={params.saved === "1"} text="Your monthly report has been saved." />
-      {params.error === "plan" && (
+      {(params.error === "plan" || params.error === "objective" || params.error === "submit") && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
-          Pick an objective and at least one focus area for the month.
+          Add at least one monthly objective with an intended outcome and focus area before submitting.
         </div>
       )}
 
@@ -128,95 +113,15 @@ export default async function MonthlyPage({
         </div>
       </Card>
 
-      {/* ---- Step 1: the plan ---- */}
-      {plan ? (
-        <Card title="This month's plan">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={plan.status === "approved" ? "green" : "amber"}>
-              {plan.status === "approved" ? "Approved by your manager" : "Waiting for manager approval"}
-            </Badge>
-          </div>
-          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">Approved objectives</p>
-          <div className="mt-2 space-y-2">
-            {planObjectives.map((objective) => (
-              <div key={objective.id}>
-                <p className="font-semibold text-navy-800">{objective.title}</p>
-                {objective.description && <p className="text-sm text-slate-600">{objective.description}</p>}
-              </div>
-            ))}
-          </div>
-          {plan.status === "proposed" && plan.manager_feedback && (
-            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              <span className="font-medium">Your manager&apos;s feedback:</span> {plan.manager_feedback}
-            </div>
-          )}
-          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">Focus areas serving these objectives</p>
-          <div className="mt-1 flex flex-wrap gap-2">
-            {pool.map((f) => (
-              <Badge key={f.id} tone="blue">{f.name}</Badge>
-            ))}
-          </div>
-          {plan.status === "proposed" && (
-            <p className="mt-3 text-sm text-slate-500">
-              You can revise the objectives, focus areas, and resubmit. Resubmitting clears the feedback and sends the updated plan back for approval.
-            </p>
-          )}
-        </Card>
-      ) : (
-        <Card title="Set your plan for this month">
-          <p className="mb-4 text-sm text-slate-600">
-            Choose one or more complementary objectives your work this month will feed, and tick the focus areas that serve them.
-            Your line manager will approve the plan.
-          </p>
-        </Card>
-      )}
-
-      {(!plan || plan.status === "proposed") && user.template_id && (
-        <Card title={plan ? "Change the proposed plan" : "Propose your plan"}>
-          {objectives.length === 0 ? (
-            <p className="text-sm text-slate-600">
-              Your line manager has not created any strategic objectives yet — ask them to add some under My team → Objectives.
-            </p>
-          ) : (
-            <form action={proposeMonthlyPlan} className="space-y-4">
-              <input type="hidden" name="year" value={year} />
-              <input type="hidden" name="month" value={month} />
-              <div>
-                <p className="mb-2 text-sm font-medium text-slate-700">Strategic objectives</p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {objectives.map((o) => (
-                    <label key={o.id} className="flex items-start gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
-                      <input type="checkbox" name="objective_ids" value={o.id}
-                        defaultChecked={planObjectives.some((selected) => selected.id === o.id)} className="mt-0.5 h-4 w-4 rounded border-slate-300" />
-                      <span><span className="font-medium">{o.title}</span>{o.description && <span className="mt-0.5 block text-xs text-slate-500">{o.description}</span>}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="mb-2 text-sm font-medium text-slate-700">Focus areas that will serve it this month</p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {focusAreas.map((f) => (
-                    <label key={f.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
-                      <input
-                        type="checkbox"
-                        name="focus_ids"
-                        value={f.id}
-                        defaultChecked={pool.some((p) => p.id === f.id)}
-                        className="h-4 w-4 rounded border-slate-300"
-                      />
-                      {f.name}
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <button type="submit" className={btnPrimary}>
-                {plan ? "Resubmit plan for approval" : "Send plan to my manager"}
-              </button>
-            </form>
-          )}
-        </Card>
-      )}
+      <Card title="Monthly objectives">
+        {plan && <div className="mb-4 flex flex-wrap gap-2"><Badge tone={plan.status === "approved" ? "green" : plan.submitted_at ? "blue" : "amber"}>{plan.status === "approved" ? "Approved" : plan.submitted_at ? "Waiting for manager approval" : "Draft"}</Badge></div>}
+        {plan?.manager_feedback && !plan.submitted_at && <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><span className="font-medium">Manager feedback:</span> {plan.manager_feedback}</div>}
+        <div className="space-y-4">
+          {workObjectives.map((objective) => <div key={objective.id} className="rounded-lg border border-slate-200 p-4"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-900">{objective.title}</p>{objective.priority === "high" && <Badge tone="amber">High priority</Badge>}</div><p className="mt-1 text-sm text-slate-600">{objective.intended_outcome}</p><p className="mt-2 text-xs text-slate-500">Strategic alignment: {objective.strategic_titles}</p><div className="mt-3 space-y-2">{objective.focus_areas.map((focus) => <div key={focus.id} className="flex flex-wrap items-center gap-2 text-sm text-slate-700"><Badge tone="blue">Focus</Badge><span>{focus.title}</span><span className="text-xs text-slate-500">{focus.completed_work} of {focus.work_total} work items complete</span></div>)}</div>{plan?.status !== "approved" && <form action={addMonthlyFocusArea} className="mt-3 flex flex-wrap gap-2"><input type="hidden" name="monthly_objective_id" value={objective.id} /><input type="hidden" name="year" value={year} /><input type="hidden" name="month" value={month} /><input name="title" required className={`${inputCls} max-w-sm`} placeholder="Add a focus area" /><button type="submit" className={btnSecondary}>Add focus</button></form>}</div>)}
+        </div>
+        {plan?.status !== "approved" && <div className="mt-5 border-t border-slate-100 pt-5">{objectives.length === 0 ? <p className="text-sm text-slate-500">Your manager needs to create strategic priorities before you can plan this month.</p> : <form action={addMonthlyWorkObjective} className="grid grid-cols-1 gap-3 sm:grid-cols-2"><input type="hidden" name="year" value={year} /><input type="hidden" name="month" value={month} /><Field label="Monthly objective"><input name="title" required className={inputCls} placeholder="Meaningful outcome for this month" /></Field><Field label="Strategic alignment"><select name="strategic_objective_id" required defaultValue="" className={inputCls}><option value="" disabled>— Choose —</option>{objectives.map((objective) => <option key={objective.id} value={objective.id}>{objective.title}</option>)}</select></Field><div className="sm:col-span-2"><Field label="Intended outcome"><textarea name="intended_outcome" required rows={2} className={inputCls} placeholder="How will you know this objective has progressed?" /></Field></div><Field label="Priority"><select name="priority" defaultValue="normal" className={inputCls}><option value="normal">Normal</option><option value="high">High</option></select></Field><div className="flex items-end"><button type="submit" className={btnPrimary}>Add objective</button></div></form>}</div>}
+        {plan && plan.status !== "approved" && workObjectives.length > 0 && <form action={submitMonthlyWorkPlan} className="mt-5"><input type="hidden" name="plan_id" value={plan.id} /><button type="submit" className={btnPrimary}>Submit plan for approval</button></form>}
+      </Card>
 
       {/* ---- Step 2: the report ---- */}
       {plan?.status === "approved" && (
@@ -228,12 +133,12 @@ export default async function MonthlyPage({
                 <p className="text-xs text-slate-500">daily entries</p>
               </div>
               <div>
-                <p className="text-2xl font-semibold text-slate-900">{Number(monthStats.hours).toFixed(1)}</p>
-                <p className="text-xs text-slate-500">hours logged</p>
+                <p className="text-2xl font-semibold text-slate-900">{monthStats.work_items}</p>
+                <p className="text-xs text-slate-500">work items created</p>
               </div>
               <div>
-                <p className="text-2xl font-semibold text-slate-900">{latestProgress != null ? `${latestProgress}%` : "—"}</p>
-                <p className="text-xs text-slate-500">objective progress (latest weekly report)</p>
+                <p className="text-2xl font-semibold text-slate-900">{monthStats.completed}</p>
+                <p className="text-xs text-slate-500">completed this month</p>
               </div>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -247,12 +152,10 @@ export default async function MonthlyPage({
               })}
             </div>
             <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {objectiveProgress.map((objective) => (
+              {workObjectives.map((objective) => (
                 <div key={objective.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
                   <p className="text-sm font-medium text-slate-800">{objective.title}</p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {objective.progress_percent == null ? "No progress estimate yet" : `${objective.progress_percent}% progress`}
-                  </p>
+                  <p className="mt-1 text-sm text-slate-600">{objective.focus_areas.length === 0 ? "No focus areas linked yet" : objective.focus_areas.map((area) => `${area.title}: ${area.completed_work} of ${area.work_total}`).join(" · ")}</p>
                 </div>
               ))}
             </div>
@@ -280,7 +183,7 @@ export default async function MonthlyPage({
             <form action={saveMonthlyReview} className="space-y-4">
               <input type="hidden" name="year" value={year} />
               <input type="hidden" name="month" value={month} />
-              <input type="hidden" name="strategic_objectives" value={planObjectives.map((objective) => objective.title).join("; ")} />
+              <input type="hidden" name="strategic_objectives" value={workObjectives.map((objective) => objective.title).join("; ")} />
               <fieldset disabled={locked} className="space-y-4 disabled:opacity-70">
                 <Field
                   label="What was achieved across this month’s objectives?"

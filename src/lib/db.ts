@@ -37,12 +37,39 @@ function upgrade(db: Database.Database) {
   add("weekly_summaries", "seen_at", "seen_at TEXT");
   add("monthly_reviews", "objective_outcome", "objective_outcome TEXT NOT NULL DEFAULT ''");
   add("monthly_plans", "manager_feedback", "manager_feedback TEXT NOT NULL DEFAULT ''");
+  add("monthly_plans", "submitted_at", "submitted_at TEXT");
+  add("monthly_plans", "returned_at", "returned_at TEXT");
+  add("work_items", "monthly_objective_id", "monthly_objective_id INTEGER REFERENCES monthly_objectives(id) ON DELETE SET NULL");
+  add("work_items", "monthly_focus_area_id", "monthly_focus_area_id INTEGER REFERENCES monthly_focus_areas(id) ON DELETE SET NULL");
 
   // Preserve every existing single-objective plan as a member of the new
   // multi-objective plan structure.
   db.exec(`
     INSERT OR IGNORE INTO monthly_plan_objectives (plan_id, objective_id)
     SELECT id, objective_id FROM monthly_plans;
+  `);
+
+  // Preserve the original lightweight daily entries as historical work updates.
+  // New activity is recorded against work items, but historical reporting must
+  // remain able to see entries created before the work execution overhaul.
+  db.exec(`
+    INSERT OR IGNORE INTO work_updates (user_id, work_item_id, update_date, text, status_after, legacy_daily_log_id)
+    SELECT user_id, NULL, log_date,
+           trim(activity || CASE WHEN outcome != '' THEN ': ' || outcome ELSE '' END),
+           lower(replace(status, ' ', '_')), id
+    FROM daily_logs;
+  `);
+
+  // Translate legacy plan-to-strategy selections into staff-owned monthly
+  // objectives. The historical strategic link remains intact.
+  db.exec(`
+    INSERT OR IGNORE INTO monthly_objectives (plan_id, legacy_strategic_objective_id, title, intended_outcome, sort)
+    SELECT mpo.plan_id, o.id, o.title, o.description,
+           0
+    FROM monthly_plan_objectives mpo JOIN objectives o ON o.id = mpo.objective_id;
+    INSERT OR IGNORE INTO monthly_objective_strategic_links (monthly_objective_id, strategic_objective_id)
+    SELECT mo.id, mo.legacy_strategic_objective_id FROM monthly_objectives mo
+    WHERE mo.legacy_strategic_objective_id IS NOT NULL;
   `);
 }
 
@@ -202,6 +229,80 @@ function migrate(db: Database.Database) {
       objective_id INTEGER NOT NULL REFERENCES objectives(id),
       progress_percent INTEGER NOT NULL CHECK (progress_percent BETWEEN 0 AND 100),
       PRIMARY KEY (summary_id, objective_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS work_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      monthly_plan_id INTEGER REFERENCES monthly_plans(id) ON DELETE SET NULL,
+      objective_id INTEGER REFERENCES objectives(id) ON DELETE SET NULL,
+      focus_area_id INTEGER REFERENCES focus_areas(id) ON DELETE SET NULL,
+      work_type TEXT NOT NULL CHECK (work_type IN ('planned', 'recurring', 'reactive')),
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'in_progress', 'blocked', 'completed', 'deferred', 'cancelled')),
+      due_date TEXT,
+      completed_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_work_items_user_status_due ON work_items(user_id, status, due_date);
+
+    CREATE TABLE IF NOT EXISTS work_updates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      work_item_id INTEGER REFERENCES work_items(id) ON DELETE SET NULL,
+      update_date TEXT NOT NULL,
+      text TEXT NOT NULL,
+      status_after TEXT,
+      legacy_daily_log_id INTEGER UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_work_updates_user_date ON work_updates(user_id, update_date);
+    CREATE INDEX IF NOT EXISTS idx_work_updates_item_date ON work_updates(work_item_id, update_date);
+
+    CREATE TABLE IF NOT EXISTS blockers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      work_item_id INTEGER REFERENCES work_items(id) ON DELETE SET NULL,
+      work_update_id INTEGER REFERENCES work_updates(id) ON DELETE SET NULL,
+      created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      description TEXT NOT NULL,
+      severity TEXT NOT NULL DEFAULT 'needs_attention' CHECK (severity IN ('normal', 'needs_attention', 'critical')),
+      requires_manager_attention INTEGER NOT NULL DEFAULT 0,
+      resolved INTEGER NOT NULL DEFAULT 0,
+      resolution_note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      resolved_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_blockers_open ON blockers(resolved, requires_manager_attention);
+
+    CREATE TABLE IF NOT EXISTS monthly_objectives (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      plan_id INTEGER NOT NULL REFERENCES monthly_plans(id) ON DELETE CASCADE,
+      legacy_strategic_objective_id INTEGER REFERENCES objectives(id) ON DELETE SET NULL,
+      title TEXT NOT NULL,
+      intended_outcome TEXT NOT NULL DEFAULT '',
+      priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('normal', 'high')),
+      sort INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (plan_id, legacy_strategic_objective_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS monthly_objective_strategic_links (
+      monthly_objective_id INTEGER NOT NULL REFERENCES monthly_objectives(id) ON DELETE CASCADE,
+      strategic_objective_id INTEGER NOT NULL REFERENCES objectives(id),
+      PRIMARY KEY (monthly_objective_id, strategic_objective_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS monthly_focus_areas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      monthly_objective_id INTEGER NOT NULL REFERENCES monthly_objectives(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      target_outcome TEXT NOT NULL DEFAULT '',
+      sort INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
   upgrade(db);

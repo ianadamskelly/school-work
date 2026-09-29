@@ -3,11 +3,11 @@ import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
 import { reviewMonthly, approveMonthlyPlan, requestMonthlyPlanChanges, commentWeeklySummary } from "@/lib/actions";
 import { todayISO, MONTH_NAMES } from "@/lib/rotation";
-import { getPlanFocusPool, getPlanObjectives } from "@/lib/plan";
+import { getMonthlyWorkObjectives } from "@/lib/planning";
 import { Card, Field, PageHeader, Badge, SavedNotice, inputCls, btnPrimary } from "@/components/ui";
 
 type Person = { id: number; name: string; job_title: string; manager_id: number | null; template_id: number | null };
-type PlanRow = { id: number; year: number; month: number; status: string; manager_feedback: string };
+type PlanRow = { id: number; year: number; month: number; status: string; manager_feedback: string; submitted_at: string | null };
 type LogRow = { id: number; log_date: string; activity: string; category: string | null; hours: number; status: string; followup_required: number; followup_date: string | null };
 type WeekRow = {
   id: number; year: number; month: number; week_of_month: number;
@@ -50,13 +50,12 @@ export default async function PersonPage({
 
   const currentPlan = db
     .prepare(
-      `SELECT mp.id, mp.year, mp.month, mp.status, mp.manager_feedback
+      `SELECT mp.id, mp.year, mp.month, mp.status, mp.manager_feedback, mp.submitted_at
        FROM monthly_plans mp
        WHERE mp.user_id = ? AND mp.year = ? AND mp.month = ?`
     )
     .get(person.id, year, month) as PlanRow | undefined;
-  const planPool = currentPlan ? getPlanFocusPool(currentPlan.id) : [];
-  const planObjectives = currentPlan ? getPlanObjectives(currentPlan.id) : [];
+  const planObjectives = currentPlan ? getMonthlyWorkObjectives(currentPlan.id) : [];
 
   const weeks = db
     .prepare(
@@ -98,7 +97,7 @@ export default async function PersonPage({
   return (
     <div className="space-y-6">
       <PageHeader title={person.name} subtitle={person.job_title || undefined} />
-      <SavedNotice show={query.approved === "1"} text="Plan approved — they can now plan their weeks against it." />
+      <SavedNotice show={query.approved === "1"} text="Plan approved — their planned work can now be linked to its focus areas." />
       <SavedNotice show={query.feedback === "1"} text="Feedback sent — they can revise and resubmit their plan." />
       <SavedNotice show={query.commented === "1"} text="Comment saved — the weekly report is marked as seen." />
       <SavedNotice show={query.reviewed === "1"} text="Review saved — the staff member can now see your feedback." />
@@ -109,19 +108,14 @@ export default async function PersonPage({
         ) : (
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone={currentPlan.status === "approved" ? "green" : "amber"}>
-                {currentPlan.status === "approved" ? "Approved" : "Waiting for your approval"}
+              <Badge tone={currentPlan.status === "approved" ? "green" : currentPlan.submitted_at ? "amber" : "slate"}>
+                {currentPlan.status === "approved" ? "Approved" : currentPlan.submitted_at ? "Waiting for your approval" : "Staff draft"}
               </Badge>
             </div>
             <div className="mt-2 space-y-1">
-              {planObjectives.map((objective) => <p key={objective.id} className="font-semibold text-navy-800">{objective.title}</p>)}
+              {planObjectives.map((objective) => <div key={objective.id}><p className="font-semibold text-navy-800">{objective.title}</p><p className="text-sm text-slate-600">{objective.intended_outcome}</p><div className="mt-1 flex flex-wrap gap-2">{objective.focus_areas.map((focus) => <Badge key={focus.id} tone="blue">{focus.title}</Badge>)}</div></div>)}
             </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {planPool.map((f) => (
-                <Badge key={f.id} tone="blue">{f.name}</Badge>
-              ))}
-            </div>
-            {currentPlan.status === "proposed" && (
+            {currentPlan.status === "proposed" && currentPlan.submitted_at && (
               <div className="mt-4 space-y-3">
                 <form action={approveMonthlyPlan}>
                   <input type="hidden" name="plan_id" value={currentPlan.id} />
@@ -138,6 +132,7 @@ export default async function PersonPage({
                 </form>
               </div>
             )}
+            {currentPlan.status === "proposed" && !currentPlan.submitted_at && <p className="mt-3 text-sm text-slate-500">This is still a staff draft. It will appear in your approval queue after it is submitted.</p>}
           </div>
         )}
       </Card>

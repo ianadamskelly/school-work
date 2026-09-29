@@ -7,9 +7,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  const links: { href: string; label: string }[] = [{ href: "/", label: "Home" }];
+  const links: { href: string; label: string }[] = [{ href: "/", label: "Home" }, { href: "/work", label: "Work" }];
   if (user.template_id) {
-    links.push({ href: "/daily", label: "My day" }, { href: "/weekly", label: "My week" }, { href: "/monthly", label: "My month" });
+    links.push({ href: "/monthly", label: "Objectives" }, { href: "/weekly", label: "Reports" });
   }
   if (user.role === "manager" || user.role === "admin") {
     links.push({ href: "/team", label: "My team" });

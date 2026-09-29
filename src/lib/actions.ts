@@ -174,11 +174,12 @@ export async function approveMonthlyPlan(formData: FormData) {
   const planId = Number(formData.get("plan_id"));
   const db = getDb();
   const plan = db
-    .prepare("SELECT id, user_id FROM monthly_plans WHERE id = ?")
-    .get(planId) as { id: number; user_id: number } | undefined;
+    .prepare("SELECT id, user_id, submitted_at FROM monthly_plans WHERE id = ?")
+    .get(planId) as { id: number; user_id: number; submitted_at: string | null } | undefined;
   if (!plan) redirect("/team");
   const allowed = user.role === "admin" || (user.role === "manager" && isDirectReport(user.id, plan.user_id));
   if (!allowed) redirect("/");
+  if (!plan.submitted_at) redirect(`/team/${plan.user_id}`);
   db.prepare(
     "UPDATE monthly_plans SET status = 'approved', manager_feedback = '', approved_by = ?, approved_at = datetime('now') WHERE id = ?"
   ).run(user.id, planId);
@@ -191,15 +192,91 @@ export async function requestMonthlyPlanChanges(formData: FormData) {
   const planId = Number(formData.get("plan_id"));
   const feedback = str(formData, "manager_feedback");
   const db = getDb();
-  const plan = db.prepare("SELECT id, user_id FROM monthly_plans WHERE id = ?").get(planId) as { id: number; user_id: number } | undefined;
+  const plan = db.prepare("SELECT id, user_id, submitted_at FROM monthly_plans WHERE id = ?").get(planId) as { id: number; user_id: number; submitted_at: string | null } | undefined;
   if (!plan) redirect("/team");
   const allowed = user.role === "admin" || (user.role === "manager" && isDirectReport(user.id, plan.user_id));
   if (!allowed) redirect("/");
+  if (!plan.submitted_at) redirect(`/team/${plan.user_id}`);
   if (!feedback) redirect(`/team/${plan.user_id}?feedback=required`);
-  db.prepare("UPDATE monthly_plans SET status = 'proposed', manager_feedback = ?, approved_by = NULL, approved_at = NULL WHERE id = ?")
+  db.prepare("UPDATE monthly_plans SET status = 'proposed', manager_feedback = ?, returned_at = datetime('now'), submitted_at = NULL, approved_by = NULL, approved_at = NULL WHERE id = ?")
     .run(feedback, planId);
   revalidatePath("/team");
   redirect(`/team/${plan.user_id}?feedback=1`);
+}
+
+// ---------- staff-owned monthly objectives ----------
+
+async function requireEditablePlan(planId: number) {
+  const user = await requireUser();
+  const plan = getDb().prepare("SELECT id, status FROM monthly_plans WHERE id = ? AND user_id = ?").get(planId, user.id) as { id: number; status: string } | undefined;
+  if (!plan || plan.status === "approved") redirect("/monthly");
+  return user;
+}
+
+export async function addMonthlyWorkObjective(formData: FormData) {
+  const user = await requireUser();
+  const title = str(formData, "title");
+  const outcome = str(formData, "intended_outcome");
+  const strategicId = numOrNull(formData.get("strategic_objective_id"));
+  const year = Number(formData.get("year"));
+  const month = Number(formData.get("month"));
+  if (!title || !outcome || !strategicId) redirect(`/monthly?error=objective&year=${year}&month=${month}`);
+  const db = getDb();
+  const strategic = db.prepare("SELECT id FROM objectives WHERE id = ? AND active = 1 AND (manager_id = ? OR manager_id = ?)")
+    .get(strategicId, user.manager_id ?? -1, user.id);
+  if (!strategic) redirect(`/monthly?error=objective&year=${year}&month=${month}`);
+  const save = db.transaction(() => {
+    let plan = db.prepare("SELECT id, status FROM monthly_plans WHERE user_id = ? AND year = ? AND month = ?").get(user.id, year, month) as { id: number; status: string } | undefined;
+    if (!plan) {
+      const id = Number(db.prepare("INSERT INTO monthly_plans (user_id, year, month, objective_id, status) VALUES (?, ?, ?, ?, 'proposed')")
+        .run(user.id, year, month, strategicId).lastInsertRowid);
+      plan = { id, status: "proposed" };
+    }
+    if (plan.status === "approved") redirect(`/monthly?year=${year}&month=${month}`);
+    const sort = (db.prepare("SELECT COUNT(*) AS n FROM monthly_objectives WHERE plan_id = ?").get(plan.id) as { n: number }).n;
+    const objectiveId = Number(db.prepare(
+      "INSERT INTO monthly_objectives (plan_id, title, intended_outcome, priority, sort) VALUES (?, ?, ?, ?, ?)"
+    ).run(plan.id, title, outcome, str(formData, "priority") === "high" ? "high" : "normal", sort).lastInsertRowid);
+    db.prepare("INSERT INTO monthly_objective_strategic_links (monthly_objective_id, strategic_objective_id) VALUES (?, ?)").run(objectiveId, strategicId);
+  });
+  save();
+  revalidatePath("/monthly");
+  redirect(`/monthly?saved=objective&year=${year}&month=${month}`);
+}
+
+export async function addMonthlyFocusArea(formData: FormData) {
+  const objectiveId = Number(formData.get("monthly_objective_id"));
+  const title = str(formData, "title");
+  const year = Number(formData.get("year"));
+  const month = Number(formData.get("month"));
+  if (!title) redirect(`/monthly?year=${year}&month=${month}`);
+  const db = getDb();
+  const row = db.prepare("SELECT plan_id FROM monthly_objectives WHERE id = ?").get(objectiveId) as { plan_id: number } | undefined;
+  if (!row) redirect("/monthly");
+  await requireEditablePlan(row.plan_id);
+  const sort = (db.prepare("SELECT COUNT(*) AS n FROM monthly_focus_areas WHERE monthly_objective_id = ?").get(objectiveId) as { n: number }).n;
+  db.prepare("INSERT INTO monthly_focus_areas (monthly_objective_id, title, target_outcome, sort) VALUES (?, ?, ?, ?)")
+    .run(objectiveId, title, str(formData, "target_outcome"), sort);
+  revalidatePath("/monthly");
+  redirect(`/monthly?saved=focus&year=${year}&month=${month}`);
+}
+
+export async function submitMonthlyWorkPlan(formData: FormData) {
+  const planId = Number(formData.get("plan_id"));
+  const user = await requireEditablePlan(planId);
+  const db = getDb();
+  const counts = db.prepare(
+    `SELECT COUNT(*) AS objectives,
+            (SELECT COUNT(*) FROM monthly_focus_areas mfa JOIN monthly_objectives mo ON mo.id = mfa.monthly_objective_id WHERE mo.plan_id = ?) AS focus_areas
+     FROM monthly_objectives WHERE plan_id = ?`
+  ).get(planId, planId) as { objectives: number; focus_areas: number };
+  const plan = db.prepare("SELECT year, month FROM monthly_plans WHERE id = ? AND user_id = ?").get(planId, user.id) as { year: number; month: number };
+  if (counts.objectives === 0 || counts.focus_areas === 0) redirect(`/monthly?error=submit&year=${plan.year}&month=${plan.month}`);
+  db.prepare("UPDATE monthly_plans SET status = 'proposed', submitted_at = datetime('now'), returned_at = NULL, manager_feedback = '' WHERE id = ?")
+    .run(planId);
+  revalidatePath("/monthly");
+  revalidatePath("/team");
+  redirect(`/monthly?saved=plan&year=${plan.year}&month=${plan.month}`);
 }
 
 // ---------- weekly reports ----------
@@ -212,24 +289,23 @@ export async function saveWeeklySummary(formData: FormData) {
   const submit = formData.get("intent") === "submit";
   const db = getDb();
 
-  // Focus areas must come from the approved monthly plan's pool.
+  // Focus selections are optional report context. Generated work sections also
+  // include recurring and reactive work, which must remain reportable without
+  // an approved monthly plan.
   const plan = db
     .prepare("SELECT id, status FROM monthly_plans WHERE user_id = ? AND year = ? AND month = ?")
     .get(user.id, year, month) as { id: number; status: string } | undefined;
-  if (!plan || plan.status !== "approved") {
-    redirect(`/weekly?error=noplan&year=${year}&month=${month}&week=${week}`);
-  }
-  const planObjectives = db
-    .prepare("SELECT objective_id FROM monthly_plan_objectives WHERE plan_id = ?")
-    .all(plan.id) as { objective_id: number }[];
-  const pool = new Set(
-    (db.prepare("SELECT focus_area_id FROM monthly_plan_focus WHERE plan_id = ?").all(plan.id) as
-      { focus_area_id: number }[]).map((r) => r.focus_area_id)
-  );
+  const planObjectives = plan?.status === "approved"
+    ? (db.prepare("SELECT objective_id FROM monthly_plan_objectives WHERE plan_id = ?").all(plan.id) as { objective_id: number }[])
+    : [];
+  const focusRows: { focus_area_id: number }[] = plan?.status === "approved"
+    ? (db.prepare("SELECT focus_area_id FROM monthly_plan_focus WHERE plan_id = ?").all(plan.id) as { focus_area_id: number }[])
+    : [];
+  const pool = new Set(focusRows.map((row) => row.focus_area_id));
   const focus1 = numOrNull(formData.get("focus_area_id"));
   let focus2 = numOrNull(formData.get("focus_area_2_id"));
   if (focus2 === focus1) focus2 = null;
-  if (!focus1 || !pool.has(focus1) || (focus2 !== null && !pool.has(focus2))) {
+  if ((focus1 !== null && !pool.has(focus1)) || (focus2 !== null && !pool.has(focus2))) {
     redirect(`/weekly?error=focus&year=${year}&month=${month}&week=${week}`);
   }
   const objectiveProgress = planObjectives.flatMap(({ objective_id }) => {
@@ -534,6 +610,117 @@ export async function deleteTemplateItem(formData: FormData) {
   }
   revalidatePath(`/admin/templates/${templateId}`);
   redirect(`/admin/templates/${templateId}`);
+}
+
+// ---------- work execution ----------
+
+const WORK_STATUSES = new Set(["planned", "in_progress", "blocked", "completed", "deferred", "cancelled"]);
+const WORK_TYPES = new Set(["planned", "recurring", "reactive"]);
+
+export async function createWorkItem(formData: FormData) {
+  const user = await requireUser();
+  const title = str(formData, "title");
+  const workType = str(formData, "work_type") || "planned";
+  const status = str(formData, "status") || "planned";
+  if (!title || !WORK_TYPES.has(workType) || !WORK_STATUSES.has(status)) redirect("/work?error=work");
+  const db = getDb();
+  const objectiveId = numOrNull(formData.get("objective_id"));
+  const focusAreaId = numOrNull(formData.get("monthly_focus_area_id"));
+  let monthlyObjectiveId: number | null = null;
+  let monthlyPlanId: number | null = null;
+  let linkedStrategicId = objectiveId;
+  if (focusAreaId) {
+    const linkedFocus = db.prepare(
+      `SELECT mfa.id, mfa.monthly_objective_id, mp.id AS monthly_plan_id,
+              (SELECT strategic_objective_id FROM monthly_objective_strategic_links WHERE monthly_objective_id = mo.id ORDER BY id LIMIT 1) AS strategic_objective_id
+       FROM monthly_focus_areas mfa
+       JOIN monthly_objectives mo ON mo.id = mfa.monthly_objective_id
+       JOIN monthly_plans mp ON mp.id = mo.plan_id
+       WHERE mfa.id = ? AND mp.user_id = ? AND mp.status = 'approved'`
+    ).get(focusAreaId, user.id) as { monthly_objective_id: number; monthly_plan_id: number; strategic_objective_id: number | null } | undefined;
+    if (!linkedFocus) redirect("/work?error=objective");
+    monthlyObjectiveId = linkedFocus.monthly_objective_id;
+    monthlyPlanId = linkedFocus.monthly_plan_id;
+    linkedStrategicId = linkedFocus.strategic_objective_id;
+  }
+  if (linkedStrategicId && !focusAreaId) {
+    const allowed = db.prepare(
+      `SELECT 1 FROM monthly_plans mp JOIN monthly_plan_objectives mpo ON mpo.plan_id = mp.id
+       WHERE mp.user_id = ? AND mpo.objective_id = ? AND mp.status = 'approved'`
+    ).get(user.id, objectiveId);
+    if (!allowed) redirect("/work?error=objective");
+  }
+  db.prepare(
+    `INSERT INTO work_items (user_id, monthly_plan_id, monthly_objective_id, monthly_focus_area_id, objective_id, work_type, title, description, status, due_date, completed_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'completed' THEN datetime('now') ELSE NULL END)`
+  ).run(user.id, monthlyPlanId, monthlyObjectiveId, focusAreaId, linkedStrategicId, workType, title, str(formData, "description"), status, str(formData, "due_date") || null, status);
+  revalidatePath("/");
+  revalidatePath("/work");
+  revalidatePath("/weekly");
+  revalidatePath("/monthly");
+  redirect("/work?saved=work");
+}
+
+export async function addWorkUpdate(formData: FormData) {
+  const user = await requireUser();
+  const text = str(formData, "text");
+  const workItemId = numOrNull(formData.get("work_item_id"));
+  const status = str(formData, "status");
+  if (!text) redirect("/?error=update");
+  if (status && !WORK_STATUSES.has(status)) redirect("/?error=update");
+  const db = getDb();
+  const save = db.transaction(() => {
+    let itemId = workItemId;
+    if (itemId) {
+      const item = db.prepare("SELECT id FROM work_items WHERE id = ? AND user_id = ?").get(itemId, user.id);
+      if (!item) redirect("/work");
+    } else {
+      // A global quick update becomes reactive work plus its first update. It
+      // keeps unplanned operational effort visible without changing the plan.
+      itemId = Number(db.prepare(
+        `INSERT INTO work_items (user_id, work_type, title, status, completed_at)
+         VALUES (?, 'reactive', ?, ?, CASE WHEN ? = 'completed' THEN datetime('now') ELSE NULL END)`
+      ).run(user.id, text, status || "completed", status || "completed").lastInsertRowid);
+    }
+    db.prepare(
+      "INSERT INTO work_updates (user_id, work_item_id, update_date, text, status_after) VALUES (?, ?, ?, ?, ?)"
+    ).run(user.id, itemId, str(formData, "update_date") || new Date().toISOString().slice(0, 10), text, status || null);
+    if (status) {
+      db.prepare("UPDATE work_items SET status = ?, completed_at = CASE WHEN ? = 'completed' THEN datetime('now') ELSE completed_at END, updated_at = datetime('now') WHERE id = ?")
+        .run(status, status, itemId);
+    }
+    if (formData.get("blocker") === "on") {
+      db.prepare(
+        "INSERT INTO blockers (work_item_id, created_by, description, severity, requires_manager_attention) VALUES (?, ?, ?, ?, 1)"
+      ).run(itemId, user.id, str(formData, "blocker_description") || text, str(formData, "blocker_severity") || "needs_attention");
+      db.prepare("UPDATE work_items SET status = 'blocked', updated_at = datetime('now') WHERE id = ?").run(itemId);
+    }
+  });
+  save();
+  revalidatePath("/");
+  revalidatePath("/work");
+  revalidatePath("/weekly");
+  revalidatePath("/monthly");
+  redirect(String(formData.get("return_to") ?? "/") + "?saved=update");
+}
+
+export async function setWorkStatus(formData: FormData) {
+  const user = await requireUser();
+  const id = Number(formData.get("id"));
+  const status = str(formData, "status");
+  if (!WORK_STATUSES.has(status)) redirect("/work");
+  const db = getDb();
+  const change = db.prepare(
+    "UPDATE work_items SET status = ?, completed_at = CASE WHEN ? = 'completed' THEN datetime('now') ELSE completed_at END, updated_at = datetime('now') WHERE id = ? AND user_id = ?"
+  ).run(status, status, id, user.id);
+  if (change.changes > 0) {
+    db.prepare("INSERT INTO work_updates (user_id, work_item_id, update_date, text, status_after) VALUES (?, ?, date('now'), ?, ?)")
+      .run(user.id, id, `Marked ${status.replace("_", " ")}.`, status);
+  }
+  revalidatePath("/");
+  revalidatePath("/work");
+  revalidatePath("/weekly");
+  revalidatePath("/monthly");
 }
 
 // ---------- helpers ----------

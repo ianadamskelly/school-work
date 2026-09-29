@@ -1,180 +1,83 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
+import { addWorkUpdate } from "@/lib/actions";
+import { reportingWeekStart, listWork, weeklyDraft, workStats } from "@/lib/work";
 import { weekOfMonth, todayISO, MONTH_NAMES } from "@/lib/rotation";
-import { getMonthlyPlan, getPlanObjectives, getWeekFocus } from "@/lib/plan";
-import { Card, Badge, btnPrimary } from "@/components/ui";
+import { getMonthlyPlan, getPlanObjectives } from "@/lib/plan";
+import { Card, Badge, SavedNotice, inputCls, btnPrimary } from "@/components/ui";
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string }> }) {
   const user = await requireSessionUser();
+  const params = await searchParams;
   const db = getDb();
   const now = new Date();
   const today = todayISO();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
   const week = weekOfMonth(now);
-
   const plan = user.template_id ? getMonthlyPlan(user.id, year, month) : null;
-  const planObjectives = plan ? getPlanObjectives(plan.id) : [];
-  const weekFocus = plan?.status === "approved" ? getWeekFocus(user.id, year, month, week) : [];
-
-  const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
-  const stats = db
-    .prepare(
-      `SELECT COUNT(*) AS total,
-              SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) AS completed,
-              COALESCE(SUM(hours), 0) AS hours
-       FROM daily_logs WHERE user_id = ? AND log_date >= ?`
-    )
-    .get(user.id, monthStart) as { total: number; completed: number; hours: number };
-
-  const overdue = db
-    .prepare(
-      `SELECT COUNT(*) AS n FROM daily_logs
-       WHERE user_id = ? AND followup_required = 1 AND status != 'Completed'
-         AND followup_date IS NOT NULL AND followup_date < ?`
-    )
-    .get(user.id, today) as { n: number };
-
-  const weekReports = db
-    .prepare(
-      "SELECT week_of_month, status, progress_percent FROM weekly_summaries WHERE user_id = ? AND year = ? AND month = ? ORDER BY week_of_month"
-    )
-    .all(user.id, year, month) as { week_of_month: number; status: string; progress_percent: number | null }[];
-  const latestProgress = [...weekReports].reverse().find((w) => w.progress_percent !== null)?.progress_percent;
-
-  const teamCount =
-    user.role === "manager" || user.role === "admin"
-      ? (db.prepare("SELECT COUNT(*) AS n FROM users WHERE manager_id = ? AND active = 1").get(user.id) as { n: number }).n
-      : 0;
-  const pendingApprovals =
-    teamCount > 0
-      ? (db
-          .prepare(
-            `SELECT COUNT(*) AS n FROM monthly_plans mp JOIN users u ON u.id = mp.user_id
-             WHERE u.manager_id = ? AND mp.status = 'proposed'`
-          )
-          .get(user.id) as { n: number }).n
-      : 0;
-  const unseenWeeklies =
-    teamCount > 0
-      ? (db
-          .prepare(
-            `SELECT COUNT(*) AS n FROM weekly_summaries ws JOIN users u ON u.id = ws.user_id
-             WHERE u.manager_id = ? AND ws.status = 'submitted'`
-          )
-          .get(user.id) as { n: number }).n
-      : 0;
+  const objectives = plan ? getPlanObjectives(plan.id) : [];
+  const work = listWork(user.id, "today", today).slice(0, 6);
+  const draft = weeklyDraft(user.id, year, month, week);
+  const stats = workStats(user.id, reportingWeekStart(year, month, week), week === 4 ? `${year}-${String(month).padStart(2, "0")}-31` : `${year}-${String(month).padStart(2, "0")}-${String(week * 7).padStart(2, "0")}`);
+  const recentUpdates = db.prepare(
+    `SELECT wu.id, wu.update_date, wu.text, wi.title AS work_title
+     FROM work_updates wu LEFT JOIN work_items wi ON wi.id = wu.work_item_id
+     WHERE wu.user_id = ? ORDER BY wu.update_date DESC, wu.id DESC LIMIT 5`
+  ).all(user.id) as { id: number; update_date: string; text: string; work_title: string | null }[];
+  const currentItems = listWork(user.id, "week", today).slice(0, 40);
+  const team = user.role === "manager" || user.role === "admin"
+    ? db.prepare("SELECT COUNT(*) AS n FROM users WHERE manager_id = ? AND active = 1").get(user.id) as { n: number }
+    : null;
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Hello, {user.name.split(" ")[0]}</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          {now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · week {week} of the month
-        </p>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Good morning, {user.name.split(" ")[0]}</h1>
+        <p className="mt-1 text-sm text-slate-600">{now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
       </div>
+      <SavedNotice show={params.saved === "update"} text="Update recorded — it is now part of this week’s report draft." />
+      {params.error === "update" && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">Write a short update before saving.</div>}
 
-      {user.template_id && (
-        !plan ? (
-          <Card>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{MONTH_NAMES[month - 1]}</p>
-                <p className="mt-1 text-sm text-slate-700">
-                  You have not set a strategic objective for this month yet. That is the first step — everything else follows it.
-                </p>
-              </div>
-              <Link href="/monthly" className={btnPrimary}>Plan my month</Link>
-            </div>
-          </Card>
-        ) : (
-          <Card>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">This month&apos;s objective</p>
-              <Badge tone={plan.status === "approved" ? "green" : "amber"}>
-                {plan.status === "approved" ? "Approved" : "Waiting for approval"}
-              </Badge>
-            </div>
-            <div className="mt-1 flex flex-wrap gap-2">
-              {planObjectives.map((objective) => <Badge key={objective.id} tone="blue">{objective.title}</Badge>)}
-            </div>
-            {plan.status === "approved" && (
-              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap items-center gap-2">
-                  {weekFocus.length > 0 ? (
-                    <>
-                      <span className="text-xs text-slate-500">This week:</span>
-                      {weekFocus.map((f) => (
-                        <Badge key={f.id} tone="blue">{f.name}</Badge>
-                      ))}
-                    </>
-                  ) : (
-                    <Link href="/weekly" className="text-sm font-medium text-navy-600 underline">
-                      Pick this week&apos;s focus areas →
-                    </Link>
-                  )}
-                  {latestProgress != null && <Badge tone="green">{latestProgress}% progress</Badge>}
-                </div>
-                <Link href="/daily" className={btnPrimary}>Log today&apos;s work</Link>
-              </div>
+      <Card title="Quick update">
+        <p className="mb-3 text-sm text-slate-600">Capture the work once. Your weekly and monthly reports reuse it automatically.</p>
+        <form action={addWorkUpdate} className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_15rem_10rem_auto]">
+          <input type="hidden" name="return_to" value="/" />
+          <textarea name="text" required rows={2} className={inputCls} placeholder="What did you work on?" />
+          <select name="work_item_id" defaultValue="" className={inputCls}>
+            <option value="">New reactive work</option>
+            {currentItems.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+          </select>
+          <select name="status" defaultValue="in_progress" className={inputCls}>
+            <option value="in_progress">In progress</option><option value="completed">Completed</option><option value="blocked">Blocked</option>
+          </select>
+          <button type="submit" className={btnPrimary}>Add update</button>
+        </form>
+      </Card>
+
+      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+        <div className="space-y-6">
+          <Card title={`Today${work.length ? ` · ${work.length}` : ""}`}>
+            {work.length === 0 ? <p className="text-sm text-slate-500">No work needs attention today. <Link href="/work" className="font-medium text-navy-600 underline">View all work</Link></p> : (
+              <ul className="divide-y divide-slate-100">
+                {work.map((item) => <li key={item.id} className="flex flex-wrap items-center gap-2 py-3"><div className="min-w-0 flex-1"><p className="text-sm font-medium text-slate-800">{item.title}</p>{item.objective_title && <p className="text-xs text-slate-500">{item.objective_title}</p>}</div><Badge tone={item.status === "blocked" ? "red" : item.status === "completed" ? "green" : "blue"}>{item.status.replace("_", " ")}</Badge></li>)}
+              </ul>
             )}
           </Card>
-        )
-      )}
-
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Card>
-          <p className="text-xs text-slate-500">Tasks logged in {MONTH_NAMES[month - 1]}</p>
-          <p className="mt-1 text-2xl font-semibold text-slate-900">{stats.total}</p>
-        </Card>
-        <Card>
-          <p className="text-xs text-slate-500">Weekly reports sent</p>
-          <p className="mt-1 text-2xl font-semibold text-slate-900">
-            {weekReports.filter((w) => w.status !== "draft").length}<span className="text-sm text-slate-400"> / {week}</span>
-          </p>
-        </Card>
-        <Card>
-          <p className="text-xs text-slate-500">Hours this month</p>
-          <p className="mt-1 text-2xl font-semibold text-slate-900">{Number(stats.hours).toFixed(1)}</p>
-        </Card>
-        <Card>
-          <p className="text-xs text-slate-500">Overdue follow-ups</p>
-          <p className={`mt-1 text-2xl font-semibold ${overdue.n > 0 ? "text-red-600" : "text-slate-900"}`}>{overdue.n}</p>
-          {overdue.n > 0 && (
-            <Link href="/daily" className="text-xs text-navy-600 underline">See them</Link>
-          )}
-        </Card>
-      </div>
-
-      {(user.role === "manager" || user.role === "admin") && (
-        <Card title="Your team">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-              {teamCount === 0 ? (
-                "Nobody reports to you yet."
-              ) : (
-                <>
-                  <span>{teamCount} {teamCount === 1 ? "person" : "people"}</span>
-                  {pendingApprovals > 0 && <Badge tone="amber">{pendingApprovals} plan{pendingApprovals === 1 ? "" : "s"} to approve</Badge>}
-                  {unseenWeeklies > 0 && <Badge tone="blue">{unseenWeeklies} weekly report{unseenWeeklies === 1 ? "" : "s"} to read</Badge>}
-                </>
-              )}
-            </div>
-            <Link href="/team" className="text-sm font-medium text-navy-600 hover:underline">
-              Open team dashboard →
-            </Link>
-          </div>
-        </Card>
-      )}
-
-      {overdue.n > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <Badge tone="amber">Reminder</Badge>{" "}
-          You have {overdue.n} follow-up{overdue.n === 1 ? "" : "s"} past the due date. Open{" "}
-          <Link href="/daily" className="font-medium underline">My day</Link> to close them off.
+          <Card title="Recent activity">
+            {recentUpdates.length === 0 ? <p className="text-sm text-slate-500">Your latest updates will appear here.</p> : <ul className="space-y-3">{recentUpdates.map((update) => <li key={update.id}><p className="text-sm text-slate-800">{update.text}</p><p className="mt-0.5 text-xs text-slate-500">{update.work_title ?? "Reactive work"} · {update.update_date}</p></li>)}</ul>}
+          </Card>
         </div>
-      )}
+        <div className="space-y-6">
+          <Card title="This week"><div className="grid grid-cols-3 gap-2 text-center"><div><p className="text-2xl font-semibold text-emerald-700">{stats.completed ?? 0}</p><p className="text-xs text-slate-500">complete</p></div><div><p className="text-2xl font-semibold text-navy-700">{stats.active ?? 0}</p><p className="text-xs text-slate-500">active</p></div><div><p className="text-2xl font-semibold text-red-600">{stats.blocked ?? 0}</p><p className="text-xs text-slate-500">blocked</p></div></div></Card>
+          <Card title="Your objectives">
+            {!plan ? <p className="text-sm text-slate-500">Set a monthly plan to connect planned work to your priorities. <Link href="/monthly" className="font-medium text-navy-600 underline">Plan {MONTH_NAMES[month - 1]}</Link></p> : <div className="space-y-2">{objectives.map((objective) => <p key={objective.id} className="text-sm font-medium text-slate-800">{objective.title}</p>)}</div>}
+          </Card>
+          <Card title="Weekly report"><p className="text-sm text-slate-600">Your draft is being built from {draft.reduce((total, section) => total + section.items.length, 0)} update{draft.reduce((total, section) => total + section.items.length, 0) === 1 ? "" : "s"} this week.</p><Link href="/weekly" className={`${btnPrimary} mt-3 w-full`}>Review draft</Link></Card>
+        </div>
+      </div>
+      {team && <Card title="Your team"><div className="flex items-center justify-between gap-3 text-sm text-slate-600"><span>{team.n} direct report{team.n === 1 ? "" : "s"}</span><Link href="/team" className="font-medium text-navy-600 hover:underline">Open team overview →</Link></div></Card>}
     </div>
   );
 }

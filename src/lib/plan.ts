@@ -4,6 +4,8 @@ export type MonthlyPlan = {
   id: number;
   status: "proposed" | "approved";
   manager_feedback: string;
+  submitted_at: string | null;
+  returned_at: string | null;
 };
 
 export type WeekFocus = { id: number; name: string };
@@ -12,7 +14,7 @@ export type MonthlyObjective = { id: number; title: string; description: string 
 export function getMonthlyPlan(userId: number, year: number, month: number): MonthlyPlan | null {
   const row = getDb()
     .prepare(
-      `SELECT mp.id, mp.status, mp.manager_feedback
+      `SELECT mp.id, mp.status, mp.manager_feedback, mp.submitted_at, mp.returned_at
        FROM monthly_plans mp
        WHERE mp.user_id = ? AND mp.year = ? AND mp.month = ?`
     )
