@@ -2,140 +2,32 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
-import { todayISO } from "@/lib/rotation";
-import { Card, PageHeader, Badge, btnSecondary } from "@/components/ui";
+import { MONTH_NAMES } from "@/lib/rotation";
+import { btnPrimary, btnSecondary, inputCls } from "@/components/ui";
 
-type Member = {
-  id: number;
-  name: string;
-  job_title: string;
-  manager_name: string | null;
-  objective_title: string | null;
-  plan_status: string | null;
-  logs_month: number;
-  hours_month: number;
-  overdue: number;
-  weeklies_submitted: number;
-  latest_progress: number | null;
-  pending_reviews: number;
-};
+type Member = { id: number; name: string; job_title: string; plan_id: number | null; plan_status: string | null; submitted_at: string | null; objective_count: number; focus_count: number; blockers: number; weekly_pending: number; last_update: string | null; completed: number; total_work: number };
+type Activity = { kind: "report" | "plan" | "blocker"; name: string; detail: string; href: string; when: string };
+type IconName = "team" | "report" | "alert" | "target" | "check" | "clock" | "arrow" | "search" | "view" | "sun" | "plus";
+function Icon({ name, className = "" }: { name: IconName; className?: string }) { const paths: Record<IconName, React.ReactNode> = { team: <><circle cx="9" cy="9" r="3" /><circle cx="16" cy="10" r="2.5" /><path d="M3.5 20c.5-3.3 2.4-5 5.5-5s5 1.7 5.5 5M14 15c3 0 5 1.7 5.5 5" /></>, report: <><path d="M7 3h7l3 3v15H7z" /><path d="M14 3v4h4M10 12h4M10 16h4" /></>, alert: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5M12 16h.01" /></>, target: <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><path d="m12 12 7-7" /></>, check: <><circle cx="12" cy="12" r="9" /><path d="m8 12 2.5 2.5L16 9" /></>, clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>, arrow: <path d="M5 12h14m-5-5 5 5-5 5" />, search: <><circle cx="10.5" cy="10.5" r="5.5" /><path d="m15 15 5 5" /></>, view: <><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12" /><circle cx="12" cy="12" r="2.5" /></>, sun: <><circle cx="12" cy="12" r="3.5" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" /></>, plus: <path d="M12 5v14M5 12h14" /> }; return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className={className}>{paths[name]}</svg>; }
+function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) { return <section className={`rounded-xl border border-slate-200 bg-white shadow-[0_2px_5px_rgba(15,23,42,0.025)] ${className}`}>{children}</section>; }
 
-export default async function TeamPage() {
-  const user = await requireSessionUser();
-  if (user.role !== "manager" && user.role !== "admin") redirect("/");
-
-  const db = getDb();
-  const now = new Date();
-  const today = todayISO();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  const monthStart = `${year}-${String(month).padStart(2, "0")}-01`;
-
-  const scope =
-    user.role === "admin" ? "u.template_id IS NOT NULL AND u.active = 1" : "u.manager_id = ? AND u.active = 1";
-  const scopeArgs = user.role === "admin" ? [] : [user.id];
-
-  const members = db
-    .prepare(
-      `SELECT u.id, u.name, u.job_title, m.name AS manager_name,
-        (SELECT group_concat(o.title, ' · ') FROM monthly_plans mp
-           JOIN monthly_plan_objectives mpo ON mpo.plan_id = mp.id
-           JOIN objectives o ON o.id = mpo.objective_id
-           WHERE mp.user_id = u.id AND mp.year = ? AND mp.month = ?) AS objective_title,
-        (SELECT mp.status FROM monthly_plans mp
-           WHERE mp.user_id = u.id AND mp.year = ? AND mp.month = ?) AS plan_status,
-        (SELECT COUNT(*) FROM daily_logs dl WHERE dl.user_id = u.id AND dl.log_date >= ?) AS logs_month,
-        (SELECT COALESCE(SUM(hours),0) FROM daily_logs dl WHERE dl.user_id = u.id AND dl.log_date >= ?) AS hours_month,
-        (SELECT COUNT(*) FROM daily_logs dl WHERE dl.user_id = u.id AND dl.followup_required = 1
-           AND dl.status != 'Completed' AND dl.followup_date IS NOT NULL AND dl.followup_date < ?) AS overdue,
-        (SELECT COUNT(*) FROM weekly_summaries ws WHERE ws.user_id = u.id AND ws.status = 'submitted') AS weeklies_submitted,
-        (SELECT ws.progress_percent FROM weekly_summaries ws
-           WHERE ws.user_id = u.id AND ws.year = ? AND ws.month = ? AND ws.progress_percent IS NOT NULL
-           ORDER BY ws.week_of_month DESC LIMIT 1) AS latest_progress,
-        (SELECT COUNT(*) FROM monthly_reviews mr WHERE mr.user_id = u.id AND mr.status = 'submitted') AS pending_reviews
-       FROM users u
-       LEFT JOIN users m ON m.id = u.manager_id
-       WHERE ${scope}
-       ORDER BY u.name`
-    )
-    .all(year, month, year, month, monthStart, monthStart, today, year, month, ...scopeArgs) as Member[];
-
-  const plansToApprove = members.filter((m) => m.plan_status === "proposed").length;
-  const weekliesToRead = members.reduce((s, m) => s + m.weeklies_submitted, 0);
-  const reviewsToSign = members.reduce((s, m) => s + m.pending_reviews, 0);
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader
-          title={user.role === "admin" ? "All staff" : "My team"}
-          subtitle="Each person's month at a glance. Click a name for their full record."
-        />
-        <Link href="/team/objectives" className={btnSecondary}>Strategic objectives</Link>
-      </div>
-
-      {(plansToApprove > 0 || weekliesToRead > 0 || reviewsToSign > 0) && (
-        <div className="flex flex-wrap gap-2 rounded-xl border border-navy-100 bg-navy-50 px-4 py-3 text-sm text-navy-800">
-          <span className="font-medium">Waiting for you:</span>
-          {plansToApprove > 0 && <Badge tone="amber">{plansToApprove} monthly plan{plansToApprove === 1 ? "" : "s"} to approve</Badge>}
-          {weekliesToRead > 0 && <Badge tone="blue">{weekliesToRead} weekly report{weekliesToRead === 1 ? "" : "s"} to read</Badge>}
-          {reviewsToSign > 0 && <Badge tone="green">{reviewsToSign} monthly review{reviewsToSign === 1 ? "" : "s"} to sign off</Badge>}
-        </div>
-      )}
-
-      {members.length === 0 ? (
-        <Card>
-          <p className="text-sm text-slate-600">Nobody reports to you yet. Ask your administrator to assign staff to you.</p>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {members.map((m) => (
-            <Link key={m.id} href={`/team/${m.id}`} className="block">
-              <Card className="h-full transition hover:border-navy-600">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-slate-900">{m.name}</p>
-                    <p className="text-sm text-slate-500">{m.job_title || "—"}</p>
-                    {user.role === "admin" && m.manager_name && (
-                      <p className="text-xs text-slate-400">Reports to {m.manager_name}</p>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    {m.plan_status === "proposed" && <Badge tone="amber">Plan to approve</Badge>}
-                    {m.weeklies_submitted > 0 && <Badge tone="blue">{m.weeklies_submitted} weekly to read</Badge>}
-                    {m.pending_reviews > 0 && <Badge tone="green">Month to sign off</Badge>}
-                    {m.overdue > 0 && <Badge tone="red">{m.overdue} overdue</Badge>}
-                  </div>
-                </div>
-                <div className="mt-3 border-t border-slate-100 pt-3">
-                  {m.objective_title ? (
-                    <p className="truncate text-sm text-slate-700">
-                      <span className="text-xs uppercase tracking-wide text-slate-400">Objective: </span>
-                      {m.objective_title}
-                    </p>
-                  ) : (
-                    <p className="text-sm italic text-slate-400">No plan for this month yet</p>
-                  )}
-                </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <p className="text-lg font-semibold text-slate-900">{m.logs_month}</p>
-                    <p className="text-xs text-slate-500">tasks this month</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-semibold text-slate-900">{Number(m.hours_month).toFixed(0)}</p>
-                    <p className="text-xs text-slate-500">hours logged</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-semibold text-slate-900">{m.latest_progress != null ? `${m.latest_progress}%` : "—"}</p>
-                    <p className="text-xs text-slate-500">objective progress</p>
-                  </div>
-                </div>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+export default async function TeamPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const user = await requireSessionUser(); if (user.role !== "manager" && user.role !== "admin") redirect("/"); const params = await searchParams; const objectivesTab = params.tab === "objectives"; const db = getDb(); const now = new Date(); const year = now.getFullYear(); const month = now.getMonth() + 1;
+  const scope = user.role === "admin" ? "u.template_id IS NOT NULL AND u.active = 1" : "u.manager_id = ? AND u.active = 1"; const scopeArgs = user.role === "admin" ? [] : [user.id];
+  const members = db.prepare(`SELECT u.id, u.name, u.job_title, mp.id AS plan_id, mp.status AS plan_status, mp.submitted_at, (SELECT COUNT(*) FROM monthly_objectives mo WHERE mo.plan_id = mp.id) AS objective_count, (SELECT COUNT(*) FROM monthly_focus_areas mfa JOIN monthly_objectives mo ON mo.id = mfa.monthly_objective_id WHERE mo.plan_id = mp.id) AS focus_count, (SELECT COUNT(*) FROM blockers b JOIN work_items wi ON wi.id = b.work_item_id WHERE wi.user_id = u.id AND b.resolved = 0) AS blockers, (SELECT COUNT(*) FROM weekly_summaries ws WHERE ws.user_id = u.id AND ws.status = 'submitted') AS weekly_pending, (SELECT MAX(update_date) FROM work_updates wu WHERE wu.user_id = u.id) AS last_update, (SELECT COUNT(*) FROM work_items wi WHERE wi.user_id = u.id AND wi.status = 'completed') AS completed, (SELECT COUNT(*) FROM work_items wi WHERE wi.user_id = u.id AND wi.status != 'cancelled') AS total_work FROM users u LEFT JOIN monthly_plans mp ON mp.user_id = u.id AND mp.year = ? AND mp.month = ? WHERE ${scope} ORDER BY u.name`).all(year, month, ...scopeArgs) as Member[];
+  const plansPending = members.filter((member) => member.plan_status === "proposed" && member.submitted_at); const reportsPending = members.filter((member) => member.weekly_pending > 0); const blockers = members.filter((member) => member.blockers > 0); const activities: Activity[] = [...reportsPending.map((member) => ({ kind: "report" as const, name: "Weekly report awaiting review", detail: `${member.name} has submitted a weekly report.`, href: `/team/${member.id}`, when: "Needs review" })), ...plansPending.map((member) => ({ kind: "plan" as const, name: "Objective plan pending approval", detail: `${member.name} submitted ${member.objective_count} objectives for your review.`, href: `/team/${member.id}`, when: "Needs approval" })), ...blockers.map((member) => ({ kind: "blocker" as const, name: "Work needs attention", detail: `${member.name} has ${member.blockers} open blocker${member.blockers === 1 ? "" : "s"}.`, href: `/team/${member.id}`, when: "Open" }))].slice(0, 5);
+  return objectivesTab ? <ObjectivesApproval members={members} year={year} month={month} /> : <Overview members={members} activities={activities} plansPending={plansPending.length} reportsPending={reportsPending.length} blockers={blockers.length} />;
 }
+
+function Overview({ members, activities, plansPending, reportsPending, blockers }: { members: Member[]; activities: Activity[]; plansPending: number; reportsPending: number; blockers: number }) { const average = members.length ? Math.round(members.reduce((sum, member) => sum + (member.total_work ? member.completed / member.total_work * 100 : 0), 0) / members.length) : 0; return <div className="space-y-4 xl:space-y-5"><div className="flex flex-wrap items-start justify-between gap-4 pt-1"><div><h1 className="text-[40px] font-bold leading-none tracking-[-0.045em] text-slate-950">Team Overview</h1><p className="mt-2 text-[17px] text-slate-500">Monitor progress, review reports, and unblock work.</p></div><div className="hidden items-center gap-3 rounded-xl bg-slate-100 px-5 py-3 text-sm italic text-slate-500 lg:flex"><Icon name="sun" className="h-7 w-7 text-amber-500" />“Great teams turn progress<br />into possibility.”</div></div>
+    <Panel className="p-4"><h2 className="text-xl font-bold tracking-tight text-slate-950">Needs your attention</h2><div className="mt-3 grid gap-3 md:grid-cols-3"><Attention icon="report" color="blue" value={reportsPending} label="Reports awaiting review" href="/team" /><Attention icon="alert" color="red" value={blockers} label="Team members blocked" href="/team" /><Attention icon="team" color="violet" value={plansPending} label="Plans pending approval" href="/team?tab=objectives" /></div></Panel>
+    <div className="grid gap-4 xl:grid-cols-[1.55fr_1fr]"><div className="space-y-4"><Panel className="p-5"><div className="flex items-center justify-between"><div><h2 className="text-xl font-bold tracking-tight text-slate-950">Team progress</h2><p className="mt-1 text-sm text-slate-500">Overall progress across team members</p></div><span className="text-sm font-medium text-blue-600">View details <Icon name="arrow" className="inline h-4 w-4" /></span></div><div className="mt-4 space-y-4">{members.length === 0 ? <p className="text-sm text-slate-500">Nobody reports to you yet.</p> : members.slice(0, 4).map((member, index) => { const progress = member.total_work ? Math.round(member.completed / member.total_work * 100) : 0; return <div key={member.id} className="flex items-center gap-3"><span className={`flex h-10 w-10 items-center justify-center rounded-xl ${index % 3 === 1 ? "bg-violet-50 text-violet-600" : index % 3 === 2 ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"}`}><Icon name={index % 3 === 1 ? "team" : index % 3 === 2 ? "check" : "target"} className="h-5 w-5" /></span><p className="w-32 truncate text-sm font-semibold text-slate-800">{member.name}</p><div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: `${progress}%` }} /></div><span className="w-10 text-right text-sm font-bold text-slate-700">{progress}%</span><span className="hidden text-xs text-emerald-600 lg:inline">↑ On track</span></div>; })}</div></Panel>
+      <Panel className="p-5"><div className="flex items-center justify-between"><div><h2 className="text-xl font-bold tracking-tight text-slate-950">Team members</h2><p className="mt-1 text-sm text-slate-500">{members.length} team member{members.length === 1 ? "" : "s"}</p></div><Link href="/admin" className={`${btnSecondary} gap-2 px-3 py-2`}><Icon name="plus" className="h-4 w-4 text-blue-600" />Invite member</Link></div><div className="mt-4 overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="border-b border-slate-100 text-xs text-slate-500"><tr><th className="pb-2 font-medium">Name</th><th className="pb-2 font-medium">Role</th><th className="pb-2 font-medium">Status</th><th className="pb-2 font-medium">Objectives</th><th className="pb-2 font-medium">Last update</th><th className="pb-2 font-medium">Attention</th></tr></thead><tbody>{members.map((member) => { const progress = member.total_work ? Math.round(member.completed / member.total_work * 100) : 0; const status = member.blockers ? "At risk" : progress >= 50 ? "On track" : "In progress"; return <tr key={member.id} className="border-b border-slate-100 last:border-0"><td className="py-3"><Link href={`/team/${member.id}`} className="font-semibold text-slate-800 hover:text-blue-600">{member.name}</Link></td><td className="py-3 text-slate-500">{member.job_title || "—"}</td><td className="py-3"><span className={`rounded-full px-2 py-1 text-xs font-medium ${status === "At risk" ? "bg-amber-50 text-amber-700" : status === "On track" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}>● {status}</span></td><td className="py-3 text-slate-600">{member.objective_count}</td><td className="py-3 text-slate-500">{member.last_update ?? "—"}</td><td className="py-3">{member.blockers ? <span className="rounded-full bg-red-50 px-2 py-1 text-xs text-red-600">{member.blockers} blocker{member.blockers === 1 ? "" : "s"}</span> : member.weekly_pending ? <span className="rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-600">1 report</span> : <span className="text-slate-400">—</span>}</td></tr>; })}</tbody></table></div></Panel>
+      <div className="grid gap-4 md:grid-cols-2"><TrendChart progress={average} /><StatusChart members={members} /></div></div>
+      <aside className="space-y-4"><Panel className="p-5"><div className="flex items-center justify-between"><div><h2 className="text-xl font-bold tracking-tight text-slate-950">Team objectives</h2><p className="mt-1 text-sm text-slate-500">{members.reduce((sum, member) => sum + member.objective_count, 0)} objectives this month</p></div><Link href="/team?tab=objectives" className="text-sm font-medium text-blue-600">Review all <Icon name="arrow" className="inline h-4 w-4" /></Link></div><div className="mt-5 flex items-center gap-4"><div className="flex h-28 w-28 items-center justify-center rounded-full border-[14px] border-blue-600"><div className="text-center"><p className="text-2xl font-bold text-slate-900">{members.reduce((sum, member) => sum + member.objective_count, 0)}</p><p className="text-xs text-slate-500">Objectives</p></div></div><div className="space-y-2 text-sm"><p><span className="mr-2 inline-block h-3 w-3 rounded-full bg-emerald-500" />{members.filter((member) => member.blockers === 0).length} On track</p><p><span className="mr-2 inline-block h-3 w-3 rounded-full bg-amber-500" />{members.filter((member) => member.blockers === 0 && member.total_work === 0).length} At risk</p><p><span className="mr-2 inline-block h-3 w-3 rounded-full bg-red-500" />{members.filter((member) => member.blockers > 0).length} Blocked</p></div></div></Panel><Panel className="p-5"><div className="flex items-center justify-between"><h2 className="text-xl font-bold tracking-tight text-slate-950">Recent activity & approvals</h2><Link href="/team?tab=objectives" className="text-sm font-medium text-blue-600">View all</Link></div><div className="mt-4 space-y-4">{activities.length === 0 ? <p className="text-sm text-slate-500">Everything is up to date.</p> : activities.map((activity) => <Link key={`${activity.kind}-${activity.href}`} href={activity.href} className="flex gap-3"><span className={`mt-0.5 rounded-full p-1.5 ${activity.kind === "blocker" ? "bg-red-100 text-red-500" : activity.kind === "plan" ? "bg-violet-100 text-violet-600" : "bg-blue-100 text-blue-600"}`}><Icon name={activity.kind === "blocker" ? "alert" : activity.kind === "plan" ? "team" : "report"} className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-800">{activity.name}</p><p className="text-xs text-slate-500">{activity.detail}</p></div><span className="whitespace-nowrap text-xs text-slate-400">{activity.when}</span></Link>)}</div></Panel></aside></div></div>; }
+
+function ObjectivesApproval({ members, year, month }: { members: Member[]; year: number; month: number }) { const pending = members.filter((member) => member.plan_status === "proposed" && member.submitted_at); const approved = members.filter((member) => member.plan_status === "approved"); const drafts = members.filter((member) => member.plan_status === "proposed" && !member.submitted_at); return <div className="space-y-4 xl:space-y-5"><div className="flex flex-wrap items-start justify-between gap-4 pt-1"><div><h1 className="text-[40px] font-bold leading-none tracking-[-0.045em] text-slate-950">Team Objectives — {MONTH_NAMES[month - 1]} {year}</h1><p className="mt-2 text-[17px] text-slate-500">Review and approve your team’s monthly objective proposals.</p></div><div className="hidden items-center gap-3 rounded-xl bg-slate-100 px-5 py-3 text-sm italic text-slate-500 lg:flex"><Icon name="sun" className="h-7 w-7 text-amber-500" />“Clear goals create stronger teams.”</div></div><div className="flex gap-6 border-b border-slate-200"><Link href="/team?tab=objectives" className="border-b-2 border-blue-600 px-3 py-3 text-sm font-semibold text-blue-600">Pending Approval <span className="ml-1 rounded-full bg-blue-50 px-2 py-1">{pending.length}</span></Link><Link href="/team" className="px-3 py-3 text-sm font-medium text-slate-500">Overview</Link><span className="px-3 py-3 text-sm text-slate-500">Approved <span className="ml-1 rounded-full bg-slate-100 px-2 py-1">{approved.length}</span></span><span className="px-3 py-3 text-sm text-slate-500">Drafts <span className="ml-1 rounded-full bg-slate-100 px-2 py-1">{drafts.length}</span></span></div><div className="grid gap-4 xl:grid-cols-[1.75fr_0.8fr]"><Panel className="overflow-hidden"><div className="grid gap-3 border-b border-slate-100 bg-slate-50 p-4 sm:grid-cols-[1.4fr_0.8fr_0.8fr]"><div className="relative"><Icon name="search" className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><input className={`${inputCls} pl-9`} placeholder="Search team members by name or role..." /></div><select className={inputCls} disabled><option>All departments</option></select><select className={inputCls} disabled><option>All statuses</option></select></div><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left"><thead className="border-b border-slate-100 text-xs text-slate-500"><tr><th className="px-4 py-4">Team member</th><th>Objectives</th><th>Focus areas</th><th>Submitted</th><th>Actions</th></tr></thead><tbody>{pending.length === 0 ? <tr><td colSpan={5} className="px-4 py-12 text-center text-sm text-slate-500">No objective plans are awaiting approval.</td></tr> : pending.map((member) => <tr key={member.id} className="border-b border-slate-100 last:border-0"><td className="px-4 py-4"><p className="font-semibold text-slate-800">{member.name}</p><p className="text-sm text-slate-500">{member.job_title || "—"}</p></td><td className="py-4 font-semibold text-slate-700">{member.objective_count}</td><td className="py-4 font-semibold text-slate-700">{member.focus_count}</td><td className="py-4 text-sm text-slate-600">{member.submitted_at?.slice(0, 10) ?? "—"}</td><td className="py-4"><div className="flex gap-2"><Link href={`/team/${member.id}`} className={`${btnSecondary} px-3 py-2 text-xs`}><Icon name="view" className="h-4 w-4" />View</Link><Link href={`/team/${member.id}`} className={`${btnPrimary} px-3 py-2 text-xs`}>Review</Link></div></td></tr>)}</tbody></table></div></Panel><aside className="space-y-4"><Panel className="p-5"><h2 className="text-xl font-bold tracking-tight text-slate-950">Submission Summary</h2><div className="mt-5 flex items-center gap-4"><div className="flex h-28 w-28 items-center justify-center rounded-full border-[14px] border-emerald-500"><div className="text-center"><p className="text-2xl font-bold text-slate-900">{members.length}</p><p className="text-xs text-slate-500">Total</p></div></div><div className="space-y-2 text-sm"><p><span className="mr-2 inline-block h-3 w-3 rounded-full bg-amber-400" />{pending.length} Pending approval</p><p><span className="mr-2 inline-block h-3 w-3 rounded-full bg-emerald-500" />{approved.length} Approved</p><p><span className="mr-2 inline-block h-3 w-3 rounded-full bg-slate-400" />{drafts.length} Draft</p></div></div></Panel><Panel className="p-5"><h2 className="text-xl font-bold text-slate-950">Your Team</h2><p className="mt-3 text-lg font-semibold text-slate-800">{members.length} team members</p><p className="text-sm text-slate-500">{members.filter((member) => member.plan_status).length}/{members.length} have started their objectives</p><div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${members.length ? members.filter((member) => member.plan_status).length / members.length * 100 : 0}%` }} /></div></Panel><Panel className="bg-blue-50 p-5"><div className="flex gap-3"><Icon name="target" className="h-6 w-6 text-blue-600" /><p className="text-sm leading-5 text-slate-600"><span className="block font-semibold text-blue-700">Review and approve</span>Check that objectives are clear, measurable and aligned with team priorities.</p></div></Panel></aside></div></div>; }
+
+function Attention({ icon, color, value, label, href }: { icon: "report" | "alert" | "team"; color: "blue" | "red" | "violet"; value: number; label: string; href: string }) { const styles = { blue: "bg-blue-50 text-blue-600", red: "bg-red-50 text-red-500", violet: "bg-violet-50 text-violet-600" }; return <Link href={href} className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 hover:border-blue-200"><span className={`rounded-xl p-3 ${styles[color]}`}><Icon name={icon} className="h-6 w-6" /></span><div><p className="text-2xl font-bold text-slate-950">{value}</p><p className="text-sm text-slate-500">{label}</p></div><Icon name="arrow" className="ml-auto h-5 w-5 text-slate-400" /></Link>; }
+function TrendChart({ progress }: { progress: number }) { return <Panel className="p-5"><h2 className="text-lg font-bold text-slate-950">Team progress over time</h2><p className="text-xs text-slate-500">Average objective progress</p><div className="mt-5 flex h-28 items-end gap-2 border-b border-l border-slate-200 px-3"><div className="w-1/4 rounded-t bg-blue-100" style={{ height: "30%" }} /><div className="w-1/4 rounded-t bg-blue-200" style={{ height: "45%" }} /><div className="w-1/4 rounded-t bg-blue-400" style={{ height: "60%" }} /><div className="w-1/4 rounded-t bg-blue-600" style={{ height: `${Math.max(15, progress)}%` }} /></div><div className="mt-2 flex justify-between text-xs text-slate-400"><span>Oct</span><span>Nov</span><span>Dec</span><span>Jan</span></div></Panel>; }
+function StatusChart({ members }: { members: Member[] }) { return <Panel className="p-5"><h2 className="text-lg font-bold text-slate-950">Objective status</h2><p className="text-xs text-slate-500">Across your team</p><div className="mt-5 flex h-28 items-end justify-around gap-4">{["On track", "At risk", "Blocked"].map((label, index) => { const count = index === 0 ? members.filter((member) => member.blockers === 0).length : index === 1 ? members.filter((member) => member.blockers === 0 && member.total_work === 0).length : members.filter((member) => member.blockers > 0).length; return <div key={label} className="flex flex-col items-center gap-2"><span className="text-sm font-bold text-slate-700">{count}</span><div className={`w-10 rounded-t ${index === 0 ? "bg-emerald-500" : index === 1 ? "bg-amber-400" : "bg-red-500"}`} style={{ height: `${Math.max(10, count * 24)}px` }} /><span className="text-[10px] text-slate-500">{label}</span></div>; })}</div></Panel>; }
