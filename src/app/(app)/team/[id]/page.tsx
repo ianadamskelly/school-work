@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
-import { reviewMonthly, approveMonthlyPlan, requestMonthlyPlanChanges, commentWeeklySummary } from "@/lib/actions";
+import { reviewMonthly, approveMonthlyPlan, requestMonthlyPlanChanges } from "@/lib/actions";
 import { todayISO, MONTH_NAMES } from "@/lib/rotation";
 import { getMonthlyWorkObjectives } from "@/lib/planning";
 import { Card, Field, PageHeader, Badge, SavedNotice, inputCls, btnPrimary } from "@/components/ui";
@@ -168,15 +169,9 @@ export default async function PersonPage({
                   </div>
                 )}
                 {w.status === "submitted" && (
-                  <form action={commentWeeklySummary} className="mt-3 flex flex-col gap-2 rounded-lg bg-navy-50 p-3 sm:flex-row">
-                    <input type="hidden" name="summary_id" value={w.id} />
-                    <input
-                      name="manager_comment"
-                      className={inputCls}
-                      placeholder="Optional comment — leaving it blank still marks the report as seen"
-                    />
-                    <button type="submit" className={`${btnPrimary} shrink-0`}>Mark as seen</button>
-                  </form>
+                  <Link href={`/team/reports/${w.id}`} className="mt-3 inline-flex rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                    Review report
+                  </Link>
                 )}
                 {w.status === "seen" && w.manager_comment && (
                   <p className="mt-2 text-sm text-slate-600"><span className="font-medium">Your comment:</span> {w.manager_comment}</p>

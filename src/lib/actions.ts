@@ -377,6 +377,38 @@ export async function commentWeeklySummary(formData: FormData) {
   redirect(`/team/${summary.user_id}?commented=1`);
 }
 
+export async function approveWeeklySummary(formData: FormData) {
+  const user = await requireUser();
+  const summaryId = Number(formData.get("summary_id"));
+  const db = getDb();
+  const summary = db.prepare("SELECT id, user_id FROM weekly_summaries WHERE id = ?").get(summaryId) as { id: number; user_id: number } | undefined;
+  if (!summary) redirect("/team");
+  const allowed = user.role === "admin" || (user.role === "manager" && isDirectReport(user.id, summary.user_id));
+  if (!allowed) redirect("/");
+  db.prepare("UPDATE weekly_summaries SET manager_comment = ?, status = 'seen', seen_at = datetime('now') WHERE id = ?")
+    .run(str(formData, "manager_comment"), summaryId);
+  revalidatePath("/team");
+  revalidatePath(`/team/reports/${summaryId}`);
+  redirect(`/team/reports/${summaryId}?reviewed=approved`);
+}
+
+export async function requestWeeklySummaryChanges(formData: FormData) {
+  const user = await requireUser();
+  const summaryId = Number(formData.get("summary_id"));
+  const feedback = str(formData, "manager_comment");
+  const db = getDb();
+  const summary = db.prepare("SELECT id, user_id FROM weekly_summaries WHERE id = ?").get(summaryId) as { id: number; user_id: number } | undefined;
+  if (!summary) redirect("/team");
+  const allowed = user.role === "admin" || (user.role === "manager" && isDirectReport(user.id, summary.user_id));
+  if (!allowed) redirect("/");
+  if (!feedback) redirect(`/team/reports/${summaryId}?feedback=required`);
+  db.prepare("UPDATE weekly_summaries SET manager_comment = ?, status = 'changes_requested', seen_at = datetime('now') WHERE id = ?")
+    .run(feedback, summaryId);
+  revalidatePath("/team");
+  revalidatePath(`/team/reports/${summaryId}`);
+  redirect(`/team/reports/${summaryId}?reviewed=changes`);
+}
+
 // ---------- monthly reviews ----------
 
 export async function saveMonthlyReview(formData: FormData) {
