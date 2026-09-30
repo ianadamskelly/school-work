@@ -5,248 +5,47 @@ import { addMonthlyFocusArea, addMonthlyWorkObjective, saveMonthlyReview, submit
 import { MONTH_NAMES } from "@/lib/rotation";
 import { getMonthlyPlan } from "@/lib/plan";
 import { getMonthlyWorkObjectives } from "@/lib/planning";
-import { Card, Field, PageHeader, Badge, SavedNotice, inputCls, btnPrimary, btnSecondary } from "@/components/ui";
+import { Field, SavedNotice, inputCls, btnPrimary, btnSecondary } from "@/components/ui";
 
-type TorArea = { id: number; name: string };
 type Objective = { id: number; title: string; description: string };
-type Review = {
-  id: number;
-  strategic_objectives: string;
-  objective_outcome: string;
-  key_achievements: string;
-  outputs_delivered: string;
-  impact_summary: string;
-  recommendations: string;
-  pending_items: string;
-  self_rating: number | null;
-  status: "draft" | "submitted" | "reviewed";
-  manager_rating: number | null;
-  manager_comments: string;
-};
+type Review = { objective_outcome: string; key_achievements: string; outputs_delivered: string; impact_summary: string; recommendations: string; pending_items: string; self_rating: number | null; status: "draft" | "submitted" | "reviewed"; manager_rating: number | null; manager_comments: string };
+type Signal = { id: number; work_items: number; updates: number; blockers: number };
 
-export default async function MonthlyPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ saved?: string; error?: string; year?: string; month?: string }>;
-}) {
-  const user = await requireSessionUser();
-  const params = await searchParams;
-  const db = getDb();
-  const now = new Date();
-
-  const year = Number(params.year) || now.getFullYear();
-  const month = Number(params.month) || now.getMonth() + 1;
-
-  const plan = getMonthlyPlan(user.id, year, month);
-  const workObjectives = plan ? getMonthlyWorkObjectives(plan.id) : [];
-
-  // Objectives this person may pick from: their line manager's list (or their own if they manage).
-  const objectives = db
-    .prepare(
-      "SELECT id, title, description FROM objectives WHERE active = 1 AND (manager_id = ? OR manager_id = ?) ORDER BY title"
-    )
-    .all(user.manager_id ?? -1, user.id) as Objective[];
-
-  const torAreas = user.template_id
-    ? (db.prepare("SELECT id, name FROM tor_areas WHERE template_id = ? ORDER BY sort").all(user.template_id) as TorArea[])
-    : [];
-
-  const review = db
-    .prepare("SELECT * FROM monthly_reviews WHERE user_id = ? AND year = ? AND month = ?")
-    .get(user.id, year, month) as Review | undefined;
-
-  const commentaries = new Map<number, string>();
-  if (review) {
-    const rows = db
-      .prepare("SELECT tor_area_id, commentary FROM monthly_commentaries WHERE review_id = ?")
-      .all(review.id) as { tor_area_id: number; commentary: string }[];
-    rows.forEach((r) => commentaries.set(r.tor_area_id, r.commentary));
-  }
-
-  // The review is built from the same work updates used by the weekly draft.
-  const monthStats = db
-    .prepare(
-      `SELECT
-        (SELECT COUNT(*) FROM work_updates WHERE user_id = ? AND update_date >= ? AND update_date <= ?) AS entries,
-        (SELECT COUNT(*) FROM work_items WHERE user_id = ? AND created_at >= ? AND created_at <= datetime(?, '+1 day')) AS work_items,
-        (SELECT COUNT(*) FROM work_items WHERE user_id = ? AND status = 'completed' AND completed_at >= ? AND completed_at <= datetime(?, '+1 day')) AS completed`
-    )
-    .get(
-      user.id,
-      `${year}-${String(month).padStart(2, "0")}-01`,
-      `${year}-${String(month).padStart(2, "0")}-31`,
-      user.id,
-      `${year}-${String(month).padStart(2, "0")}-01`,
-      `${year}-${String(month).padStart(2, "0")}-31`,
-      user.id,
-      `${year}-${String(month).padStart(2, "0")}-01`,
-      `${year}-${String(month).padStart(2, "0")}-31`
-    ) as { entries: number; work_items: number; completed: number };
-  const weekReports = db
-    .prepare(
-      "SELECT week_of_month, status, progress_percent FROM weekly_summaries WHERE user_id = ? AND year = ? AND month = ? ORDER BY week_of_month"
-    )
-    .all(user.id, year, month) as { week_of_month: number; status: string; progress_percent: number | null }[];
-  const locked = review?.status === "reviewed";
-  const prev = month === 1 ? { y: year - 1, m: 12 } : { y: year, m: month - 1 };
-  const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
-
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="My month"
-        subtitle="Plan the month around complementary strategic objectives, then track how daily work advances each one."
-      />
-      <SavedNotice show={params.saved === "plan"} text="Your plan has been sent to your line manager for approval." />
-      <SavedNotice show={params.saved === "1"} text="Your monthly report has been saved." />
-      {(params.error === "plan" || params.error === "objective" || params.error === "submit") && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
-          Add at least one monthly objective with an intended outcome and focus area before submitting.
-        </div>
-      )}
-
-      <Card>
-        <div className="flex items-center justify-between">
-          <Link href={`/monthly?year=${prev.y}&month=${prev.m}`} className={btnSecondary}>← {MONTH_NAMES[prev.m - 1]}</Link>
-          <p className="text-lg font-semibold text-slate-900">{MONTH_NAMES[month - 1]} {year}</p>
-          <Link href={`/monthly?year=${next.y}&month=${next.m}`} className={btnSecondary}>{MONTH_NAMES[next.m - 1]} →</Link>
-        </div>
-      </Card>
-
-      <Card title="Monthly objectives">
-        {plan && <div className="mb-4 flex flex-wrap gap-2"><Badge tone={plan.status === "approved" ? "green" : plan.submitted_at ? "blue" : "amber"}>{plan.status === "approved" ? "Approved" : plan.submitted_at ? "Waiting for manager approval" : "Draft"}</Badge></div>}
-        {plan?.manager_feedback && !plan.submitted_at && <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><span className="font-medium">Manager feedback:</span> {plan.manager_feedback}</div>}
-        <div className="space-y-4">
-          {workObjectives.map((objective) => <div key={objective.id} className="rounded-lg border border-slate-200 p-4"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-900">{objective.title}</p>{objective.priority === "high" && <Badge tone="amber">High priority</Badge>}</div><p className="mt-1 text-sm text-slate-600">{objective.intended_outcome}</p><p className="mt-2 text-xs text-slate-500">Strategic alignment: {objective.strategic_titles}</p><div className="mt-3 space-y-2">{objective.focus_areas.map((focus) => <div key={focus.id} className="flex flex-wrap items-center gap-2 text-sm text-slate-700"><Badge tone="blue">Focus</Badge><span>{focus.title}</span><span className="text-xs text-slate-500">{focus.completed_work} of {focus.work_total} work items complete</span></div>)}</div>{plan?.status !== "approved" && <form action={addMonthlyFocusArea} className="mt-3 flex flex-wrap gap-2"><input type="hidden" name="monthly_objective_id" value={objective.id} /><input type="hidden" name="year" value={year} /><input type="hidden" name="month" value={month} /><input name="title" required className={`${inputCls} max-w-sm`} placeholder="Add a focus area" /><button type="submit" className={btnSecondary}>Add focus</button></form>}</div>)}
-        </div>
-        {plan?.status !== "approved" && <div className="mt-5 border-t border-slate-100 pt-5">{objectives.length === 0 ? <p className="text-sm text-slate-500">Your manager needs to create strategic priorities before you can plan this month.</p> : <form action={addMonthlyWorkObjective} className="grid grid-cols-1 gap-3 sm:grid-cols-2"><input type="hidden" name="year" value={year} /><input type="hidden" name="month" value={month} /><Field label="Monthly objective"><input name="title" required className={inputCls} placeholder="Meaningful outcome for this month" /></Field><Field label="Strategic alignment"><select name="strategic_objective_id" required defaultValue="" className={inputCls}><option value="" disabled>— Choose —</option>{objectives.map((objective) => <option key={objective.id} value={objective.id}>{objective.title}</option>)}</select></Field><div className="sm:col-span-2"><Field label="Intended outcome"><textarea name="intended_outcome" required rows={2} className={inputCls} placeholder="How will you know this objective has progressed?" /></Field></div><Field label="Priority"><select name="priority" defaultValue="normal" className={inputCls}><option value="normal">Normal</option><option value="high">High</option></select></Field><div className="flex items-end"><button type="submit" className={btnPrimary}>Add objective</button></div></form>}</div>}
-        {plan && plan.status !== "approved" && workObjectives.length > 0 && <form action={submitMonthlyWorkPlan} className="mt-5"><input type="hidden" name="plan_id" value={plan.id} /><button type="submit" className={btnPrimary}>Submit plan for approval</button></form>}
-      </Card>
-
-      {/* ---- Step 2: the report ---- */}
-      {plan?.status === "approved" && (
-        <>
-          <Card title="The month so far">
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div>
-                <p className="text-2xl font-semibold text-slate-900">{monthStats.entries}</p>
-                <p className="text-xs text-slate-500">daily entries</p>
-              </div>
-              <div>
-                <p className="text-2xl font-semibold text-slate-900">{monthStats.work_items}</p>
-                <p className="text-xs text-slate-500">work items created</p>
-              </div>
-              <div>
-                <p className="text-2xl font-semibold text-slate-900">{monthStats.completed}</p>
-                <p className="text-xs text-slate-500">completed this month</p>
-              </div>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {[1, 2, 3, 4].map((w) => {
-                const r = weekReports.find((x) => x.week_of_month === w);
-                return (
-                  <Badge key={w} tone={r ? (r.status === "draft" ? "amber" : "green") : "slate"}>
-                    Week {w}: {r ? (r.status === "draft" ? "draft" : "reported") : "no report"}
-                  </Badge>
-                );
-              })}
-            </div>
-            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {workObjectives.map((objective) => (
-                <div key={objective.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                  <p className="text-sm font-medium text-slate-800">{objective.title}</p>
-                  <p className="mt-1 text-sm text-slate-600">{objective.focus_areas.length === 0 ? "No focus areas linked yet" : objective.focus_areas.map((area) => `${area.title}: ${area.completed_work} of ${area.work_total}`).join(" · ")}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {locked && review && (
-            <Card title="Your manager's feedback">
-              <p className="text-sm text-slate-700">
-                <span className="font-medium">Manager rating:</span> {review.manager_rating ?? "—"} / 5
-              </p>
-              {review.manager_comments && (
-                <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">{review.manager_comments}</p>
-              )}
-            </Card>
-          )}
-
-          <Card title={locked ? "Your report (locked after review)" : "End-of-month report"}>
-            {review && (
-              <div className="mb-4">
-                <Badge tone={review.status === "reviewed" ? "green" : review.status === "submitted" ? "blue" : "slate"}>
-                  {review.status === "reviewed" ? "Reviewed" : review.status === "submitted" ? "Submitted — waiting for review" : "Draft"}
-                </Badge>
-              </div>
-            )}
-            <form action={saveMonthlyReview} className="space-y-4">
-              <input type="hidden" name="year" value={year} />
-              <input type="hidden" name="month" value={month} />
-              <input type="hidden" name="strategic_objectives" value={workObjectives.map((objective) => objective.title).join("; ")} />
-              <fieldset disabled={locked} className="space-y-4 disabled:opacity-70">
-                <Field
-                  label="What was achieved across this month’s objectives?"
-                  hint="Use the objective progress figures above, then explain what was achieved, what remains, and what you learned."
-                >
-                  <textarea name="objective_outcome" rows={3} defaultValue={review?.objective_outcome} className={inputCls} />
-                </Field>
-                <Field label="Key achievements">
-                  <textarea name="key_achievements" rows={2} defaultValue={review?.key_achievements} className={inputCls} />
-                </Field>
-
-                {torAreas.length > 0 && (
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                    <p className="mb-3 text-sm font-semibold text-slate-800">Commentary by TOR area</p>
-                    <div className="space-y-3">
-                      {torAreas.map((t) => (
-                        <Field key={t.id} label={t.name}>
-                          <textarea name={`tor_${t.id}`} rows={2} defaultValue={commentaries.get(t.id) ?? ""} className={inputCls} />
-                        </Field>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="Outputs delivered">
-                    <textarea name="outputs_delivered" rows={2} defaultValue={review?.outputs_delivered} className={inputCls} />
-                  </Field>
-                  <Field label="Impact on school performance">
-                    <textarea name="impact_summary" rows={2} defaultValue={review?.impact_summary} className={inputCls} />
-                  </Field>
-                  <Field label="Recommendations to SMT">
-                    <textarea name="recommendations" rows={2} defaultValue={review?.recommendations} className={inputCls} />
-                  </Field>
-                  <Field label="Pending items (carry to next month)">
-                    <textarea name="pending_items" rows={2} defaultValue={review?.pending_items} className={inputCls} />
-                  </Field>
-                </div>
-
-                <Field label="Self-rating for the month" hint="1 = well below expectations, 5 = outstanding">
-                  <select name="self_rating" defaultValue={review?.self_rating ?? ""} className={`${inputCls} max-w-40`}>
-                    <option value="">—</option>
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
-                </Field>
-
-                {!locked && (
-                  <div className="flex flex-wrap gap-3 pt-2">
-                    <button type="submit" name="intent" value="draft" className={btnSecondary}>
-                      Save as draft
-                    </button>
-                    <button type="submit" name="intent" value="submit" className={btnPrimary}>
-                      Submit to my line manager
-                    </button>
-                  </div>
-                )}
-              </fieldset>
-            </form>
-          </Card>
-        </>
-      )}
-    </div>
-  );
+function Icon({ name, className = "" }: { name: "target" | "laptop" | "people" | "cap" | "check" | "clock" | "alert" | "file" | "chat" | "clip" | "arrow" | "sun"; className?: string }) {
+  const paths: Record<string, React.ReactNode> = {
+    target: <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><path d="m12 12 7-7" /></>, laptop: <><rect x="5" y="5" width="14" height="10" rx="1.5" /><path d="M3 19h18M9 19l1-4h4l1 4" /></>, people: <><circle cx="9" cy="9" r="3" /><circle cx="16" cy="10" r="2.5" /><path d="M3.5 20c.5-3.3 2.4-5 5.5-5s5 1.7 5.5 5M14 15c3 0 5 1.7 5.5 5" /></>, cap: <><path d="m3 10 9-5 9 5-9 5zM7 12v4c2.5 2 7.5 2 10 0v-4" /><path d="M21 10v6" /></>, check: <><circle cx="12" cy="12" r="9" /><path d="m8 12 2.5 2.5L16 9" /></>, clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>, alert: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5M12 16h.01" /></>, file: <><path d="M7 3h7l3 3v15H7z" /><path d="M14 3v4h4M10 12h4M10 16h4" /></>, chat: <path d="M5 5h14v10H9l-4 4z" />, clip: <path d="m8 12 5.6-5.6a3 3 0 1 1 4.2 4.2l-7.1 7.1a4.5 4.5 0 1 1-6.4-6.4l6.7-6.7" />, arrow: <path d="M5 12h14m-5-5 5 5-5 5" />, sun: <><circle cx="12" cy="12" r="3.5" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" /></>,
+  };
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className={className}>{paths[name]}</svg>;
 }
+
+function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) { return <section className={`rounded-xl border border-slate-200 bg-white shadow-[0_2px_5px_rgba(15,23,42,0.025)] ${className}`}>{children}</section>; }
+
+export default async function MonthlyPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string; year?: string; month?: string }> }) {
+  const user = await requireSessionUser(); const params = await searchParams; const db = getDb(); const now = new Date();
+  const year = Number(params.year) || now.getFullYear(); const month = Number(params.month) || now.getMonth() + 1;
+  const plan = getMonthlyPlan(user.id, year, month); const workObjectives = plan ? getMonthlyWorkObjectives(plan.id) : [];
+  const strategic = db.prepare("SELECT id, title, description FROM objectives WHERE active = 1 AND (manager_id = ? OR manager_id = ?) ORDER BY title").all(user.manager_id ?? -1, user.id) as Objective[];
+  const review = db.prepare("SELECT * FROM monthly_reviews WHERE user_id = ? AND year = ? AND month = ?").get(user.id, year, month) as Review | undefined;
+  const signals = plan ? db.prepare(`SELECT mo.id, (SELECT COUNT(*) FROM work_items wi WHERE wi.monthly_objective_id = mo.id AND wi.status != 'cancelled') AS work_items, (SELECT COUNT(*) FROM work_updates wu JOIN work_items wi ON wi.id = wu.work_item_id WHERE wi.monthly_objective_id = mo.id) AS updates, (SELECT COUNT(*) FROM blockers b JOIN work_items wi ON wi.id = b.work_item_id WHERE wi.monthly_objective_id = mo.id AND b.resolved = 0) AS blockers FROM monthly_objectives mo WHERE mo.plan_id = ?`).all(plan.id) as Signal[] : [];
+  const previous = month === 1 ? { y: year - 1, m: 12 } : { y: year, m: month - 1 }; const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
+  const totalBlockers = signals.reduce((sum, signal) => sum + signal.blockers, 0); const active = workObjectives.length; const onTrack = workObjectives.filter((objective) => { const totals = objective.focus_areas.reduce((sum, focus) => ({ done: sum.done + focus.completed_work, all: sum.all + focus.work_total }), { done: 0, all: 0 }); return totals.all === 0 || totals.done / totals.all >= 0.4; }).length;
+  return <div className="space-y-4 xl:space-y-5"><div className="flex flex-wrap items-start justify-between gap-4 pt-1"><div><h1 className="text-[40px] font-bold leading-none tracking-[-0.045em] text-slate-950">Objectives</h1><p className="mt-2 text-[17px] text-slate-500">See how your daily work connects to strategic priorities.</p></div></div>
+    <SavedNotice show={params.saved === "plan"} text="Your plan has been sent to your line manager for approval." /><SavedNotice show={params.saved === "1"} text="Your monthly review has been saved." />
+    {(params.error === "plan" || params.error === "objective" || params.error === "submit") && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Add at least one monthly objective with an intended outcome and focus area before submitting.</div>}
+    <div className="grid gap-4 xl:grid-cols-[1.75fr_0.8fr]"><div><div className="mb-4 flex items-center gap-2"><Link href={`/monthly?year=${previous.y}&month=${previous.m}`} className={`${btnSecondary} h-10 w-10 px-0`}>‹</Link><div className="flex h-10 min-w-48 items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-800">{MONTH_NAMES[month - 1]} {year}　⌄</div><Link href={`/monthly?year=${next.y}&month=${next.m}`} className={`${btnSecondary} h-10 w-10 px-0`}>›</Link></div>
+      <div className="space-y-4">{workObjectives.map((objective, index) => { const signal = signals.find((entry) => entry.id === objective.id) ?? { work_items: 0, updates: 0, blockers: 0 }; const total = objective.focus_areas.reduce((sum, focus) => sum + focus.work_total, 0); const done = objective.focus_areas.reduce((sum, focus) => sum + focus.completed_work, 0); const percentage = total ? Math.round(done / total * 100) : 0; const icon = index === 1 ? "people" as const : index === 2 ? "cap" as const : "laptop" as const; const tint = index === 1 ? "bg-violet-50 text-violet-600" : index === 2 ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"; return <Panel key={objective.id} className="p-5"><div className="flex gap-4"><span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${tint}`}><Icon name={icon} className="h-6 w-6" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-bold tracking-tight text-slate-950">{objective.title}</h2><span className="mt-1 inline-block rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-600">Strategic Objective: {objective.strategic_titles || "Not linked"}</span></div><span className="inline-flex items-center gap-1 text-sm font-medium text-blue-600">View objective <Icon name="arrow" className="h-4 w-4" /></span></div><div className="mt-3 flex items-center gap-3"><div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: `${percentage}%` }} /></div><span className="text-lg font-bold text-slate-800">{percentage}%</span></div><p className="mt-2 text-sm text-slate-500">{objective.intended_outcome || "Add an intended outcome to describe success for this objective."}</p><p className="mt-4 text-sm font-semibold text-slate-700">Focus areas <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{objective.focus_areas.length}</span></p><div className="mt-2 space-y-2">{objective.focus_areas.length === 0 ? <p className="text-sm text-slate-500">No focus areas yet.</p> : objective.focus_areas.map((focus) => <div key={focus.id} className="flex items-center gap-2 text-sm text-slate-600"><span className={`flex h-5 w-5 items-center justify-center rounded-full ${focus.work_total > 0 && focus.completed_work === focus.work_total ? "bg-emerald-500 text-white" : focus.completed_work > 0 ? "border-2 border-blue-500 text-blue-500" : "border-2 border-slate-300"}`}>{focus.work_total > 0 && focus.completed_work === focus.work_total && <Icon name="check" className="h-3.5 w-3.5" />}</span>{focus.title}<span className="ml-auto text-xs text-slate-400">{focus.completed_work} of {focus.work_total} complete</span></div>)}</div>{plan?.status !== "approved" && <form action={addMonthlyFocusArea} className="mt-3 flex gap-2"><input type="hidden" name="monthly_objective_id" value={objective.id} /><input type="hidden" name="year" value={year} /><input type="hidden" name="month" value={month} /><input name="title" required className={`${inputCls} max-w-sm`} placeholder="Add a focus area" /><button type="submit" className={btnSecondary}>Add</button></form>}<div className="mt-4 grid grid-cols-4 divide-x divide-slate-100 border-t border-slate-100 pt-3"><Metric icon="file" value={signal.work_items} label="Work items" /><Metric icon="chat" value={signal.updates} label="Updates" /><Metric icon="alert" value={signal.blockers} label="Blockers" tone="red" /><Metric icon="clip" value={0} label="Evidence" /></div></div></div></Panel>; })}</div>
+      {workObjectives.length === 0 && <Panel className="p-8 text-center"><Icon name="target" className="mx-auto h-8 w-8 text-blue-600" /><h2 className="mt-3 text-xl font-bold text-slate-900">Set your objectives for {MONTH_NAMES[month - 1]}</h2><p className="mt-1 text-sm text-slate-500">Choose complementary outcomes, then connect your work and reports to them.</p></Panel>}
+      {plan?.manager_feedback && !plan.submitted_at && <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><span className="font-semibold">Manager feedback:</span> {plan.manager_feedback}</div>}
+      {plan?.status !== "approved" && <Planner planId={plan?.id} year={year} month={month} strategic={strategic} workObjectiveCount={workObjectives.length} />}
+      {plan?.status === "approved" && <ReviewPanel year={year} month={month} review={review} objectiveNames={workObjectives.map((objective) => objective.title)} />}
+    </div>
+    <aside className="space-y-4"><Panel className="p-5"><div className="flex items-center justify-between"><h2 className="text-xl font-bold tracking-tight text-slate-950">Objectives Overview</h2><Link href="/weekly" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600">View report <Icon name="arrow" className="h-4 w-4" /></Link></div><p className="mt-4 text-4xl font-bold tracking-tight text-slate-950">{active}</p><p className="text-base text-slate-500">Active objectives</p><p className="mt-1 text-sm text-slate-400">{MONTH_NAMES[month - 1]} {year}</p><div className="mt-6 grid grid-cols-3 divide-x divide-slate-100"><Metric icon="check" value={onTrack} label="On track" tone="green" /><Metric icon="clock" value={Math.max(active - onTrack - totalBlockers, 0)} label="At risk" tone="amber" /><Metric icon="alert" value={totalBlockers} label="Blocked" tone="red" /></div></Panel>
+      <Panel className="p-5"><div className="flex items-center justify-between"><div><h2 className="text-xl font-bold tracking-tight text-slate-950">Carry Forward</h2><p className="mt-1 text-sm text-slate-500">Incomplete objectives from previous months.</p></div><span className="rounded-full bg-blue-50 p-2 text-blue-600"><Icon name="clock" className="h-5 w-5" /></span></div><div className="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No previous-month objectives need carrying forward.</div></Panel>
+      <Panel className="flex items-start gap-4 p-5"><span className="rounded-xl bg-amber-50 p-3 text-amber-500"><Icon name="sun" className="h-7 w-7" /></span><p className="pt-1 text-sm leading-6 text-slate-500"><span className="block font-medium italic text-slate-700">“Small steps make big progress.”</span>Keep your objectives focused and aligned with strategic priorities.</p></Panel>
+    </aside></div>
+  </div>;
+}
+
+function Metric({ icon, value, label, tone = "blue" }: { icon: "file" | "chat" | "alert" | "clip" | "check" | "clock"; value: number; label: string; tone?: "blue" | "red" | "green" | "amber" }) { const colors = { blue: "text-blue-600", red: "text-red-500", green: "text-emerald-600", amber: "text-amber-500" }; return <div className="px-2 text-center first:pl-0 last:pr-0"><div className={`mx-auto flex items-center justify-center ${colors[tone]}`}><Icon name={icon} className="h-6 w-6" /></div><p className="mt-1 text-xl font-bold text-slate-900">{value}</p><p className="text-xs text-slate-500">{label}</p></div>; }
+function Planner({ planId, year, month, strategic, workObjectiveCount }: { planId?: number; year: number; month: number; strategic: Objective[]; workObjectiveCount: number }) { return <details className="mt-4 rounded-xl border border-slate-200 bg-white p-5"><summary className="cursor-pointer text-lg font-bold text-slate-900">Plan this month</summary><div className="mt-5 border-t border-slate-100 pt-5">{strategic.length === 0 ? <p className="text-sm text-slate-500">Your manager needs to create strategic priorities first.</p> : <form action={addMonthlyWorkObjective} className="grid gap-3 sm:grid-cols-2"><input type="hidden" name="year" value={year} /><input type="hidden" name="month" value={month} /><Field label="Monthly objective"><input name="title" required className={inputCls} placeholder="Meaningful outcome for this month" /></Field><Field label="Strategic alignment"><select name="strategic_objective_id" required defaultValue="" className={inputCls}><option value="" disabled>— Choose —</option>{strategic.map((objective) => <option key={objective.id} value={objective.id}>{objective.title}</option>)}</select></Field><div className="sm:col-span-2"><Field label="Intended outcome"><textarea name="intended_outcome" required rows={2} className={inputCls} placeholder="How will you know this objective has progressed?" /></Field></div><Field label="Priority"><select name="priority" defaultValue="normal" className={inputCls}><option value="normal">Normal</option><option value="high">High</option></select></Field><div className="flex items-end"><button type="submit" className={btnPrimary}>Add objective</button></div></form>}{planId && workObjectiveCount > 0 && <form action={submitMonthlyWorkPlan} className="mt-5"><input type="hidden" name="plan_id" value={planId} /><button type="submit" className={btnPrimary}>Submit plan for approval</button></form>}</div></details>; }
+function ReviewPanel({ year, month, review, objectiveNames }: { year: number; month: number; review?: Review; objectiveNames: string[] }) { const locked = review?.status === "reviewed"; return <details className="mt-4 rounded-xl border border-slate-200 bg-white p-5"><summary className="cursor-pointer text-lg font-bold text-slate-900">End-of-month review</summary><form action={saveMonthlyReview} className="mt-5 space-y-4"><input type="hidden" name="year" value={year} /><input type="hidden" name="month" value={month} /><input type="hidden" name="strategic_objectives" value={objectiveNames.join("; ")} /><fieldset disabled={locked} className="space-y-4 disabled:opacity-70"><Field label="What was achieved across this month’s objectives?"><textarea name="objective_outcome" rows={3} defaultValue={review?.objective_outcome} className={inputCls} /></Field><div className="grid gap-4 sm:grid-cols-2"><Field label="Key achievements"><textarea name="key_achievements" rows={2} defaultValue={review?.key_achievements} className={inputCls} /></Field><Field label="Outputs delivered"><textarea name="outputs_delivered" rows={2} defaultValue={review?.outputs_delivered} className={inputCls} /></Field><Field label="Impact on school performance"><textarea name="impact_summary" rows={2} defaultValue={review?.impact_summary} className={inputCls} /></Field><Field label="Pending items"><textarea name="pending_items" rows={2} defaultValue={review?.pending_items} className={inputCls} /></Field></div><Field label="Recommendations to SMT"><textarea name="recommendations" rows={2} defaultValue={review?.recommendations} className={inputCls} /></Field><Field label="Self-rating"><select name="self_rating" defaultValue={review?.self_rating ?? ""} className={`${inputCls} max-w-40`}><option value="">—</option>{[1, 2, 3, 4, 5].map((rating) => <option key={rating} value={rating}>{rating}</option>)}</select></Field>{!locked && <div className="flex gap-3"><button type="submit" name="intent" value="draft" className={btnSecondary}>Save draft</button><button type="submit" name="intent" value="submit" className={btnPrimary}>Submit to manager</button></div>}</fieldset></form>{locked && <p className="mt-4 text-sm text-slate-600">Manager rating: {review?.manager_rating ?? "—"}/5 {review?.manager_comments && `· ${review.manager_comments}`}</p>}</details>; }
