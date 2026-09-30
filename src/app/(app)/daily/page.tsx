@@ -1,244 +1,60 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
-import { addDailyLog, setDailyStatus, deleteDailyLog } from "@/lib/actions";
-import { weekOfMonth, todayISO } from "@/lib/rotation";
-import { getMonthlyPlan, getPlanObjectives, getWeekFocus } from "@/lib/plan";
-import { Card, Field, PageHeader, Badge, SavedNotice, inputCls, btnPrimary } from "@/components/ui";
+import { addDailyLog } from "@/lib/actions";
+import { todayISO } from "@/lib/rotation";
 
 type Option = { id: number; name: string };
-type CategoryRow = { id: number; name: string; focus_area_id: number | null };
-type LogRow = {
-  id: number;
-  log_date: string;
-  activity: string;
-  category: string | null;
-  category_focus_id: number | null;
-  department: string | null;
-  hours: number;
-  outcome: string;
-  followup_required: number;
-  followup_date: string | null;
-  priority: string;
-  status: string;
-};
+type Log = { id: number; log_date: string; activity: string; status: string; created_at: string };
+type IconName = "calendar" | "link" | "planned" | "recurring" | "reactive" | "clock" | "paperclip" | "check" | "bulb" | "history" | "chevron";
 
-export default async function DailyPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ saved?: string }>;
-}) {
+function Icon({ name, className = "" }: { name: IconName; className?: string }) {
+  const shapes: Record<IconName, React.ReactNode> = {
+    calendar: <><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16" /></>,
+    link: <><path d="m10 13 4-4M8 17l-1.5 1.5a3 3 0 0 1-4-4L5 12M16 7l1.5-1.5a3 3 0 0 1 4 4L19 12" /></>,
+    planned: <><rect x="4" y="5" width="16" height="16" rx="2" /><path d="M8 3v4M16 3v4M8 12h8M8 16h5" /></>,
+    recurring: <><path d="M20 7V3l-2 2a8 8 0 0 0-13 3M4 17v4l2-2a8 8 0 0 0 13-3" /></>,
+    reactive: <path d="m13 2-9 12h7l-1 8 10-13h-7z" />,
+    clock: <><circle cx="12" cy="12" r="8" /><path d="M12 7v5l3 2" /></>,
+    paperclip: <path d="m9 12 5-5a3 3 0 1 1 4 4l-7 7a5 5 0 0 1-7-7l7-7" />,
+    check: <><circle cx="12" cy="12" r="9" /><path d="m8 12 2.5 2.5L16 9" /></>,
+    bulb: <><path d="M9 18h6M10 22h4M8 15c-1.2-1-2-2.6-2-4.5a6 6 0 1 1 12 0c0 1.9-.8 3.5-2 4.5-.7.6-1 1.2-1 2H9c0-.8-.3-1.4-1-2Z" /></>,
+    history: <><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5M12 7v5l3 2" /></>,
+    chevron: <path d="m9 18 6-6-6-6" />,
+  };
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">{shapes[name]}</svg>;
+}
+
+function Step({ number, title, optional, children, className = "" }: { number: number; title: string; optional?: boolean; children: React.ReactNode; className?: string }) {
+  return <div className={`flex gap-4 ${className}`}><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-blue-600">{number}</span><div className="min-w-0 flex-1"><p className="text-base font-bold text-slate-900">{title} {optional ? <span className="font-normal text-slate-500">(optional)</span> : <span className="text-red-500">*</span>}</p>{children}</div></div>;
+}
+
+export default async function DailyPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   const user = await requireSessionUser();
-  const params = await searchParams;
+  const { saved } = await searchParams;
   const db = getDb();
   const today = todayISO();
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  const week = weekOfMonth(now);
+  const categories = user.template_id ? db.prepare("SELECT id, name FROM task_categories WHERE template_id = ? ORDER BY sort").all(user.template_id) as Option[] : [];
+  const departments = user.template_id ? db.prepare("SELECT id, name FROM departments WHERE template_id = ? ORDER BY sort").all(user.template_id) as Option[] : [];
+  const recent = db.prepare("SELECT id, log_date, activity, status, created_at FROM daily_logs WHERE user_id = ? ORDER BY log_date DESC, id DESC LIMIT 4").all(user.id) as Log[];
+  const dateLabel = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date(`${today}T12:00:00`));
+  return <div className="space-y-5">
+    <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-[40px] font-bold leading-none tracking-[-.045em] text-slate-950">Daily Update</h1><p className="mt-2 text-[17px] text-slate-500">Log what you worked on today.</p></div><div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700"><span className="h-5 w-5 text-slate-600"><Icon name="calendar" /></span>{dateLabel}</div><div className="hidden items-center gap-3 rounded-xl bg-slate-100 px-5 py-3 text-sm italic text-slate-500 lg:flex"><span className="h-7 w-7 text-amber-500"><Icon name="bulb" /></span>“Small steps make big progress.”</div></div>
+    {saved === "1" && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">Your daily update has been saved and is ready for your weekly report.</div>}
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_365px]"><form action={addDailyLog} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_2px_5px_rgba(15,23,42,0.025)]"><input type="hidden" name="log_date" value={today} /><input type="hidden" name="priority" value="Medium" />
+      <div className="space-y-7 p-5 sm:p-6">
+        <Step number={1} title="What did you work on?"><textarea name="activity" required maxLength={1000} rows={4} placeholder="Describe what you worked on today..." className="mt-3 min-h-24 w-full resize-y rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500" /><p className="mt-1 text-right text-xs text-slate-400">Up to 1,000 characters</p></Step>
+        <Step number={2} title="Link to task or objective" optional><p className="mt-1 text-sm text-slate-500">Connect this update to a task, objective or project.</p><div className="relative mt-3"><span className="absolute left-3 top-3 h-5 w-5 text-slate-500"><Icon name="link" /></span><select name="category_id" defaultValue="" className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-10 text-sm text-slate-600 outline-none focus:border-blue-500"><option value="">Search and select a task or objective...</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><span className="pointer-events-none absolute right-3 top-3 h-5 w-5 text-slate-500"><Icon name="chevron" /></span></div></Step>
+        <Step number={3} title="Work type"><p className="mt-1 text-sm text-slate-500">Choose the type of work this update relates to.</p><div className="mt-3 grid gap-3 md:grid-cols-3"><WorkType icon="planned" title="Planned" text="One-off tasks and projects" checked /><WorkType icon="recurring" title="Recurring" text="Regular tasks on a schedule" /><WorkType icon="reactive" title="Reactive" text="Unplanned tasks and issues" /></div></Step>
+        <div className="grid gap-6 md:grid-cols-2"><Step number={4} title="Time spent"><div className="relative mt-3"><span className="absolute left-3 top-3 h-5 w-5 text-slate-500"><Icon name="clock" /></span><select name="hours" defaultValue="1" className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-8 text-sm text-slate-700 outline-none focus:border-blue-500"><option value="0.5">30 minutes</option><option value="1">1 hour</option><option value="2">2 hours</option><option value="3">3 hours</option><option value="4">4 hours</option><option value="8">Full day</option></select></div></Step><Step number={5} title="Status"><div className="relative mt-3"><i className="absolute left-4 top-4 h-3 w-3 rounded-full bg-emerald-500" /><select name="status" defaultValue="In Progress" className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-8 text-sm text-slate-700 outline-none focus:border-blue-500"><option>In Progress</option><option>Completed</option><option>Pending</option></select></div></Step></div>
+        <Step number={6} title="Add evidence" optional><p className="mt-1 text-sm text-slate-500">Add a note or a link to support your update. It will be included in the weekly report.</p><textarea name="outcome" rows={2} placeholder="Paste a link, describe the evidence, or add your outcome..." className="mt-3 w-full rounded-xl border border-dashed border-slate-300 px-4 py-4 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500" /><div className="mt-2 flex flex-wrap gap-3"><select name="department_id" defaultValue="" className="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600"><option value="">Department / section (optional)</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><label className="flex items-center gap-2 text-xs text-slate-500"><input name="followup_required" type="checkbox" className="h-4 w-4 rounded border-slate-300" />Needs a follow-up</label><input name="followup_date" type="date" className="rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500" /></div></Step>
+      </div>
+      <div className="flex justify-end gap-3 border-t border-slate-200 bg-slate-50/70 p-4"><Link href="/" className="rounded-lg border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700">Cancel</Link><button className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"><span className="h-5 w-5"><Icon name="check" /></span>Save update</button></div>
+    </form>
+    <aside className="space-y-5"><section className="rounded-xl border border-slate-200 bg-white p-6"><div className="flex items-center gap-3"><span className="h-7 w-7 text-blue-600"><Icon name="bulb" /></span><h2 className="text-xl font-bold text-slate-950">Tips for a great update</h2></div><ul className="mt-6 space-y-5">{[["Be clear and concise", "A few sentences is enough."], ["Link to relevant work", "Connect to a task or objective if applicable."], ["Add evidence", "Notes and links help show progress."], ["Keep it up to date", "Regular updates make reporting easier."]].map(([title, text]) => <li key={title} className="flex gap-3"><span className="h-5 w-5 shrink-0 text-blue-600"><Icon name="check" /></span><span><strong className="block text-sm text-slate-800">{title}</strong><span className="mt-1 block text-sm text-slate-500">{text}</span></span></li>)}</ul></section><section className="rounded-xl border border-slate-200 bg-white p-6"><div className="flex items-center justify-between"><div className="flex items-center gap-3"><span className="h-7 w-7 text-blue-600"><Icon name="history" /></span><h2 className="text-xl font-bold text-slate-950">Recent updates</h2></div><Link href="/weekly" className="text-sm font-medium text-blue-600">View all →</Link></div><div className="mt-5 divide-y divide-slate-100">{recent.length ? recent.slice(0, 3).map((item, index) => <div key={item.id} className="flex gap-3 py-4 first:pt-0"><i className={`mt-1.5 h-3 w-3 shrink-0 rounded-full ${index === 0 ? "bg-emerald-500" : index === 1 ? "bg-blue-600" : "bg-violet-500"}`} /><div className="min-w-0 flex-1"><p className="text-sm font-medium leading-5 text-slate-800">{item.activity}</p><p className="mt-1 text-xs text-slate-400">{item.log_date} · {item.status}</p></div></div>) : <p className="py-5 text-sm text-slate-500">Your saved updates will appear here.</p>}</div></section></aside></div>
+  </div>;
+}
 
-  const categories = user.template_id
-    ? (db
-        .prepare("SELECT id, name, focus_area_id FROM task_categories WHERE template_id = ? ORDER BY sort")
-        .all(user.template_id) as CategoryRow[])
-    : [];
-  const departments = user.template_id
-    ? (db.prepare("SELECT id, name FROM departments WHERE template_id = ? ORDER BY sort").all(user.template_id) as Option[])
-    : [];
-
-  const plan = getMonthlyPlan(user.id, year, month);
-  const planObjectives = plan ? getPlanObjectives(plan.id) : [];
-  const weekFocus = getWeekFocus(user.id, year, month, week);
-  const focusIds = new Set(weekFocus.map((f) => f.id));
-  const onFocus = categories.filter((c) => c.focus_area_id !== null && focusIds.has(c.focus_area_id));
-  const offFocus = categories.filter((c) => c.focus_area_id === null || !focusIds.has(c.focus_area_id));
-
-  // Focus choices per week of this month, for flagging older entries too.
-  const weekFocusRows = db
-    .prepare(
-      "SELECT year, month, week_of_month, focus_area_id, focus_area_2_id FROM weekly_summaries WHERE user_id = ?"
-    )
-    .all(user.id) as { year: number; month: number; week_of_month: number; focus_area_id: number | null; focus_area_2_id: number | null }[];
-  const focusByWeek = new Map<string, Set<number>>();
-  weekFocusRows.forEach((r) => {
-    const ids = [r.focus_area_id, r.focus_area_2_id].filter((v): v is number => v !== null);
-    focusByWeek.set(`${r.year}-${r.month}-${r.week_of_month}`, new Set(ids));
-  });
-
-  const logs = db
-    .prepare(
-      `SELECT dl.id, dl.log_date, dl.activity, tc.name AS category, tc.focus_area_id AS category_focus_id,
-              d.name AS department, dl.hours, dl.outcome, dl.followup_required, dl.followup_date, dl.priority, dl.status
-       FROM daily_logs dl
-       LEFT JOIN task_categories tc ON tc.id = dl.category_id
-       LEFT JOIN departments d ON d.id = dl.department_id
-       WHERE dl.user_id = ?
-       ORDER BY dl.log_date DESC, dl.id DESC
-       LIMIT 60`
-    )
-    .all(user.id) as LogRow[];
-
-  const isOverdue = (l: LogRow) =>
-    l.followup_required === 1 && l.status !== "Completed" && !!l.followup_date && l.followup_date < today;
-
-  const isOffPlan = (l: LogRow) => {
-    if (l.category_focus_id === null) return false;
-    const d = new Date(l.log_date + "T00:00:00");
-    const key = `${d.getFullYear()}-${d.getMonth() + 1}-${weekOfMonth(d)}`;
-    const ids = focusByWeek.get(key);
-    return !!ids && ids.size > 0 && !ids.has(l.category_focus_id);
-  };
-
-  return (
-    <div className="space-y-6">
-      <PageHeader title="My day" subtitle="Log what you worked on. Short entries are fine — a minute is all it should take." />
-      <SavedNotice show={params.saved === "1"} text="Your entry has been saved." />
-
-      {weekFocus.length > 0 ? (
-        <Card>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-500">This week&apos;s focus</span>
-            {weekFocus.map((f) => (
-              <Badge key={f.id} tone="blue">{f.name}</Badge>
-            ))}
-            {planObjectives.length > 0 && <span className="text-xs text-slate-500">serving: {planObjectives.map((objective) => objective.title).join(" · ")}</span>}
-          </div>
-        </Card>
-      ) : (
-        <Card>
-          <p className="text-sm text-slate-600">
-            No focus areas chosen for this week yet.{" "}
-            <Link href="/weekly" className="font-medium text-navy-600 underline">Pick this week&apos;s focus</Link>{" "}
-            so your daily entries line up with your monthly objective.
-          </p>
-        </Card>
-      )}
-
-      <Card title="Add an entry">
-        <form action={addDailyLog} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Date">
-            <input name="log_date" type="date" defaultValue={today} required className={inputCls} />
-          </Field>
-          <Field
-            label="Task category"
-            hint={weekFocus.length > 0 ? "Anything under “Other” will be flagged as off-plan — that's allowed, just visible." : undefined}
-          >
-            <select name="category_id" defaultValue="" className={inputCls}>
-              <option value="">— Choose —</option>
-              {weekFocus.length > 0 ? (
-                <>
-                  <optgroup label="This week's focus">
-                    {onFocus.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Other (off-plan)">
-                    {offFocus.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </optgroup>
-                </>
-              ) : (
-                categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))
-              )}
-            </select>
-          </Field>
-          <div className="sm:col-span-2">
-            <Field label="What did you do?">
-              <input name="activity" required placeholder="e.g. Reviewed Term 2 assessment plans with MYP coordinators" className={inputCls} />
-            </Field>
-          </div>
-          <Field label="Department / section">
-            <select name="department_id" defaultValue="" className={inputCls}>
-              <option value="">— Choose —</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Time spent (hours)">
-            <input name="hours" type="number" step="0.25" min="0" max="24" defaultValue="1" className={inputCls} />
-          </Field>
-          <div className="sm:col-span-2">
-            <Field label="Outcome / notes (optional)">
-              <textarea name="outcome" rows={2} className={inputCls} placeholder="What came out of it?" />
-            </Field>
-          </div>
-          <Field label="Priority">
-            <select name="priority" defaultValue="Medium" className={inputCls}>
-              <option>High</option>
-              <option>Medium</option>
-              <option>Low</option>
-            </select>
-          </Field>
-          <Field label="Status">
-            <select name="status" defaultValue="Completed" className={inputCls}>
-              <option>Completed</option>
-              <option>In Progress</option>
-              <option>Pending</option>
-            </select>
-          </Field>
-          <div className="flex items-end gap-4">
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input name="followup_required" type="checkbox" className="h-4 w-4 rounded border-slate-300" />
-              Needs a follow-up
-            </label>
-          </div>
-          <Field label="Follow-up date (if needed)">
-            <input name="followup_date" type="date" className={inputCls} />
-          </Field>
-          <div className="sm:col-span-2">
-            <button type="submit" className={btnPrimary}>Save entry</button>
-          </div>
-        </form>
-      </Card>
-
-      <Card title="Recent entries">
-        {logs.length === 0 ? (
-          <p className="text-sm text-slate-500">Nothing logged yet. Your entries will appear here.</p>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {logs.map((l) => (
-              <li key={l.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-slate-500">{l.log_date}</span>
-                    {l.category && <Badge tone="blue">{l.category}</Badge>}
-                    {isOffPlan(l) && <Badge tone="amber">Off-plan</Badge>}
-                    {l.department && <Badge>{l.department}</Badge>}
-                    <Badge tone={l.status === "Completed" ? "green" : l.status === "In Progress" ? "amber" : "slate"}>
-                      {l.status}
-                    </Badge>
-                    {isOverdue(l) && <Badge tone="red">Overdue follow-up: {l.followup_date}</Badge>}
-                  </div>
-                  <p className="mt-1 text-sm font-medium text-slate-800">{l.activity}</p>
-                  {l.outcome && <p className="text-sm text-slate-600">{l.outcome}</p>}
-                  <p className="mt-0.5 text-xs text-slate-400">{l.hours} h · {l.priority} priority</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {l.status !== "Completed" && (
-                    <form action={setDailyStatus}>
-                      <input type="hidden" name="id" value={l.id} />
-                      <input type="hidden" name="status" value="Completed" />
-                      <button type="submit" className="rounded-lg border border-emerald-300 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50 cursor-pointer">
-                        Mark completed
-                      </button>
-                    </form>
-                  )}
-                  <form action={deleteDailyLog}>
-                    <input type="hidden" name="id" value={l.id} />
-                    <button type="submit" className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50 cursor-pointer">
-                      Delete
-                    </button>
-                  </form>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-    </div>
-  );
+function WorkType({ icon, title, text, checked = false }: { icon: "planned" | "recurring" | "reactive"; title: string; text: string; checked?: boolean }) {
+  return <div className={`relative flex min-h-22 gap-3 rounded-xl border p-4 ${checked ? "border-blue-600 bg-blue-50/40" : "border-slate-200 bg-white"}`}><span className={`h-7 w-7 ${icon === "reactive" ? "text-amber-500" : "text-blue-600"}`}><Icon name={icon} /></span><span><strong className="block text-sm text-slate-800">{title}</strong><span className="mt-1 block text-xs leading-4 text-slate-500">{text}</span></span><i className={`absolute right-3 top-3 h-5 w-5 rounded-full border-2 ${checked ? "border-blue-600 bg-blue-600 ring-2 ring-white" : "border-slate-300"}`} /></div>;
 }
