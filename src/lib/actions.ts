@@ -470,7 +470,8 @@ export async function saveMonthlyReview(formData: FormData) {
   });
   save();
   revalidatePath("/monthly");
-  redirect(`/monthly?saved=1&year=${year}&month=${month}`);
+  revalidatePath("/reviews");
+  redirect(`/reviews?saved=1&year=${year}&month=${month}`);
 }
 
 export async function reviewMonthly(formData: FormData) {
