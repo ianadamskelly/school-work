@@ -1,49 +1,14 @@
 import { redirect } from "next/navigation";
 import { login } from "@/lib/actions";
 import { getSessionUser } from "@/lib/auth";
-import { inputCls, btnPrimary, Field } from "@/components/ui";
+import { inputCls, btnPrimary } from "@/components/ui";
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
-  const user = await getSessionUser();
-  if (user) redirect("/");
-  const params = await searchParams;
+function Mark({ small = false }: { small?: boolean }) {
+  return <span className={`relative flex items-center justify-center rounded-xl bg-blue-600 font-bold text-white shadow-sm before:absolute before:left-0 before:top-0 before:rounded-tl-xl before:bg-cyan-300 ${small ? "h-8 w-8 text-sm before:h-3.5 before:w-3.5" : "h-11 w-11 text-xl before:h-5 before:w-5"}`}>P</span>;
+}
+function Icon({ name, className = "" }: { name: "mail" | "lock" | "eye" | "sun"; className?: string }) { const shapes = { mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></>, lock: <><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 15v2" /></>, eye: <><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12" /><circle cx="12" cy="12" r="2.5" /></>, sun: <><circle cx="12" cy="12" r="3.5" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" /></> }; return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className={className}>{shapes[name]}</svg>; }
 
-  return (
-    <main className="flex flex-1 items-center justify-center p-6">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-navy-700 text-lg font-bold text-white">
-            SW
-          </div>
-          <h1 className="text-xl font-semibold text-slate-900">School Work Tracker</h1>
-          <p className="mt-1 text-sm text-slate-600">Sign in with your school account</p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          {params.error && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
-              That email or password is not right. Please try again.
-            </div>
-          )}
-          <form action={login} className="space-y-4">
-            <Field label="Email">
-              <input name="email" type="email" required autoFocus className={inputCls} placeholder="you@school.org" />
-            </Field>
-            <Field label="Password">
-              <input name="password" type="password" required className={inputCls} placeholder="Your password" />
-            </Field>
-            <button type="submit" className={`${btnPrimary} w-full`}>
-              Sign in
-            </button>
-          </form>
-        </div>
-        <p className="mt-4 text-center text-xs text-slate-500">
-          Forgotten your password? Ask your administrator to reset it.
-        </p>
-      </div>
-    </main>
-  );
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const user = await getSessionUser(); if (user) redirect("/"); const params = await searchParams;
+  return <main className="min-h-screen bg-white"><header className="flex h-[73px] items-center justify-between border-b border-slate-200 px-7"><div className="flex items-center gap-3"><Mark small /><span className="text-[26px] font-bold tracking-[-0.04em] text-slate-950">Progress</span></div><span className="rounded-xl bg-slate-100 p-3 text-amber-500"><Icon name="sun" className="h-5 w-5" /></span></header><div className="grid min-h-[calc(100vh-73px)] lg:grid-cols-2"><section className="relative hidden overflow-hidden lg:block" style={{ backgroundImage: "url('/login-office-hero.png')", backgroundPosition: "center", backgroundSize: "cover" }}><div className="absolute inset-0 bg-white/35" /><div className="relative z-10 max-w-xl px-[14%] pt-[13%]"><div className="flex items-center gap-3"><Mark /><span className="text-4xl font-bold tracking-[-0.04em] text-slate-950">Progress</span></div><h1 className="mt-12 text-6xl font-bold leading-[1.08] tracking-[-0.055em] text-slate-950">Turn your work<br />into progress</h1><p className="mt-6 max-w-lg text-[24px] leading-9 text-slate-600">Set clear objectives, log your work, and see progress across your team and school.</p></div></section><section className="flex items-center justify-center px-5 py-12 sm:px-10"><div className="w-full max-w-[570px] rounded-xl border border-slate-200 bg-white px-7 py-12 shadow-[0_8px_30px_rgba(15,23,42,0.035)] sm:px-12"><div className="text-center"><h1 className="text-[38px] font-bold leading-none tracking-[-0.045em] text-slate-950">Welcome back</h1><p className="mt-3 text-lg text-slate-500">Sign in to your Progress account.</p></div>{params.error && <div className="mt-7 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">That email or password is not right. Please try again.</div>}<form action={login} className="mt-10 space-y-7"><label className="block"><span className="mb-2 block text-base font-medium text-slate-800">Email address</span><span className="relative block"><Icon name="mail" className="pointer-events-none absolute left-4 top-3.5 h-5 w-5 text-slate-500" /><input name="email" type="email" required autoFocus className={`${inputCls} h-[54px] pl-12 text-base`} placeholder="you@school.edu" /></span></label><label className="block"><span className="mb-2 flex items-center justify-between text-base font-medium text-slate-800">Password <span className="text-sm font-medium text-blue-600">Forgot password?</span></span><span className="relative block"><Icon name="lock" className="pointer-events-none absolute left-4 top-3.5 h-5 w-5 text-slate-500" /><input name="password" type="password" required className={`${inputCls} h-[54px] pl-12 pr-12 text-base`} placeholder="Enter your password" /><Icon name="eye" className="pointer-events-none absolute right-4 top-3.5 h-5 w-5 text-slate-500" /></span></label><button type="submit" className={`${btnPrimary} h-[56px] w-full text-lg`}>Sign in</button></form><div className="my-7 flex items-center gap-4 text-sm text-slate-400"><span className="h-px flex-1 bg-slate-200" />OR<span className="h-px flex-1 bg-slate-200" /></div><button type="button" disabled title="Google sign-in is not configured yet" className="flex h-[54px] w-full cursor-not-allowed items-center justify-center gap-4 rounded-xl border border-slate-200 bg-slate-50 text-base font-semibold text-slate-400"><span className="text-xl font-bold"><span className="text-blue-500">G</span><span className="text-red-500">o</span><span className="text-amber-500">o</span><span className="text-blue-500">g</span><span className="text-emerald-500">l</span><span className="text-red-500">e</span></span>Sign in with Google <span className="text-xs font-normal">(coming soon)</span></button><p className="mx-auto mt-9 max-w-sm text-center text-sm leading-6 text-slate-500">Don’t have an account? Contact your school administrator or IT team for access.</p></div></section></div></main>;
 }
