@@ -1,102 +1,74 @@
 import Link from "next/link";
+import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
-import { createWorkItem, addWorkUpdate, setWorkStatus } from "@/lib/actions";
+import { createWorkItem, addWorkUpdate } from "@/lib/actions";
 import { listWork } from "@/lib/work";
 import { getMonthlyPlan } from "@/lib/plan";
 import { getMonthlyWorkObjectives } from "@/lib/planning";
 import { todayISO } from "@/lib/rotation";
-import { Card, Field, PageHeader, Badge, SavedNotice, inputCls, btnPrimary, btnSecondary } from "@/components/ui";
+import { SavedNotice, inputCls, btnPrimary, btnSecondary } from "@/components/ui";
 
-const VIEWS = ["today", "week", "upcoming", "blocked", "completed"] as const;
-const label = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+type GlyphName = "calendar" | "cycle" | "bolt" | "plus" | "arrow" | "clock" | "check" | "alert" | "search" | "dots" | "file";
+function Glyph({ name, className = "" }: { name: GlyphName; className?: string }) {
+  const paths: Record<GlyphName, React.ReactNode> = {
+    calendar: <><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16" /></>, cycle: <><path d="M20 7V3l-2 2a8 8 0 0 0-13 2M4 17v4l2-2a8 8 0 0 0 13-2" /><path d="M4 7h3M17 17h3" /></>, bolt: <path d="m13 2-9 12h7l-1 8 10-13h-7z" />, plus: <path d="M12 5v14M5 12h14" />, arrow: <path d="M5 12h14m-5-5 5 5-5 5" />, clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>, check: <><circle cx="12" cy="12" r="9" /><path d="m8 12 2.5 2.5L16 9" /></>, alert: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5M12 16h.01" /></>, search: <><circle cx="10.5" cy="10.5" r="5.5" /><path d="m15 15 5 5" /></>, dots: <path d="M5 12h.01M12 12h.01M19 12h.01" />, file: <><path d="M7 3h7l3 3v15H7z" /><path d="M14 3v4h4M10 12h4M10 16h4" /></>,
+  };
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className={className}>{paths[name]}</svg>;
+}
 
-export default async function WorkPage({ searchParams }: { searchParams: Promise<{ view?: string; saved?: string; error?: string }> }) {
+const VIEWS = [{ key: "today", label: "Today" }, { key: "week", label: "This Week" }, { key: "upcoming", label: "Upcoming" }, { key: "completed", label: "Completed" }] as const;
+const titleCase = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+const typeStyle = { planned: "bg-blue-50 text-blue-700", recurring: "bg-violet-50 text-violet-700", reactive: "bg-amber-50 text-amber-700" };
+
+export default async function WorkPage({ searchParams }: { searchParams: Promise<{ view?: string; saved?: string; error?: string; type?: string; status?: string; q?: string }> }) {
   const user = await requireSessionUser();
   const params = await searchParams;
-  const view = VIEWS.includes(params.view as (typeof VIEWS)[number]) ? params.view! : "today";
+  const view = VIEWS.some((entry) => entry.key === params.view) ? params.view! : "today";
   const today = todayISO();
-  const items = listWork(user.id, view, today);
   const now = new Date();
   const plan = getMonthlyPlan(user.id, now.getFullYear(), now.getMonth() + 1);
-  const workObjectives = plan?.status === "approved" ? getMonthlyWorkObjectives(plan.id) : [];
-  const focusAreas = workObjectives.flatMap((objective) => objective.focus_areas.map((area) => ({ ...area, objectiveTitle: objective.title })));
+  const objectives = plan?.status === "approved" ? getMonthlyWorkObjectives(plan.id) : [];
+  const focusAreas = objectives.flatMap((objective) => objective.focus_areas.map((area) => ({ ...area, objectiveTitle: objective.title })));
+  let items = listWork(user.id, view, today);
+  if (params.type && ["planned", "recurring", "reactive"].includes(params.type)) items = items.filter((item) => item.work_type === params.type);
+  if (params.status) items = items.filter((item) => item.status === params.status);
+  if (params.q) { const query = params.q.toLocaleLowerCase(); items = items.filter((item) => `${item.title} ${item.description} ${item.objective_title ?? ""}`.toLocaleLowerCase().includes(query)); }
+  const groups = (["planned", "recurring", "reactive"] as const).map((type) => ({ type, items: items.filter((item) => item.work_type === type) })).filter((group) => group.items.length > 0);
+  const overview = getDb().prepare(`SELECT SUM(CASE WHEN status = 'planned' THEN 1 ELSE 0 END) AS todo, SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) AS active, SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS complete, SUM(CASE WHEN status = 'blocked' THEN 1 ELSE 0 END) AS blocked FROM work_items WHERE user_id = ?`).get(user.id) as { todo: number | null; active: number | null; complete: number | null; blocked: number | null };
+  const openReactive = listWork(user.id, "week", today).filter((item) => item.work_type === "reactive" && item.status !== "completed").slice(0, 3);
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+  const workloads = days.map((_, index) => Math.max(0, Math.round(items.length / 5 + (index === now.getDay() - 1 ? 1 : 0))));
+  const maxWorkload = Math.max(...workloads, 1);
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader title="Work" subtitle="Keep work items clear; add a quick update whenever progress happens. Reports build from these updates." />
+  return <div className="space-y-4 xl:space-y-5">
+    <div className="flex flex-wrap items-start justify-between gap-4 pt-1"><div><h1 className="text-[40px] font-bold leading-none tracking-[-0.045em] text-slate-950">Work</h1><p className="mt-2 text-[17px] text-slate-500">Track planned, recurring, and reactive work.</p></div><div className="hidden items-center gap-3 rounded-xl bg-slate-100 px-5 py-3 text-sm italic text-slate-500 lg:flex"><span className="text-2xl text-amber-500">☼</span>“Organised work today<br />builds a better tomorrow.”</div></div>
+    <SavedNotice show={params.saved === "work"} text="Work item added." /><SavedNotice show={params.saved === "update"} text="Update recorded — your reports will include it." />
+    {params.error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Please check the work details and try again.</div>}
+    <div className="grid gap-4 xl:grid-cols-[1.75fr_0.8fr]">
+      <div className="min-w-0"><div className="flex overflow-x-auto rounded-xl bg-slate-100 p-1">{VIEWS.map((entry) => <Link key={entry.key} href={`/work?view=${entry.key}`} className={`min-w-28 flex-1 rounded-lg px-4 py-2.5 text-center text-sm font-medium ${view === entry.key ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>{entry.label}</Link>)}</div>
+        <form className="mt-4 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-[1fr_1fr_1fr_1.5fr]" method="get"><input type="hidden" name="view" value={view} /><label className="text-xs font-medium text-slate-600">Work type<select name="type" defaultValue={params.type ?? ""} className={`${inputCls} mt-1`}><option value="">⟳ All types</option><option value="planned">Planned</option><option value="recurring">Recurring</option><option value="reactive">Reactive</option></select></label><label className="text-xs font-medium text-slate-600">Status<select name="status" defaultValue={params.status ?? ""} className={`${inputCls} mt-1`}><option value="">◎ All statuses</option><option value="planned">To do</option><option value="in_progress">In progress</option><option value="blocked">Blocked</option></select></label><label className="text-xs font-medium text-slate-600">Objective<select className={`${inputCls} mt-1`} disabled><option>⌁ All objectives</option></select></label><label className="text-xs font-medium text-slate-600">Search work<div className="relative mt-1"><Glyph name="search" className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><input name="q" defaultValue={params.q} className={`${inputCls} pl-9`} placeholder="Search work..." /></div></label></form>
+        <div className="mt-4 space-y-3">{groups.length === 0 ? <EmptyWork /> : groups.map((group) => <WorkGroup key={group.type} type={group.type} items={group.items} focusAreas={focusAreas} />)}</div>
       </div>
-      <SavedNotice show={params.saved === "work"} text="Work item added." />
-      <SavedNotice show={params.saved === "update"} text="Update recorded — your reports will include it." />
-      {params.error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">Please check the work details and try again.</div>}
-
-      <Card title="Add work">
-        <p className="mb-4 text-sm text-slate-600">Plan work ahead, record recurring responsibilities, or capture unexpected reactive work. Updates against each item build your reports.</p>
-        <form action={createWorkItem} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="What needs doing?">
-            <input name="title" required className={inputCls} placeholder="e.g. Resolve a staff login issue" />
-          </Field>
-          <Field label="Status">
-            <select name="status" defaultValue="in_progress" className={inputCls}>
-              <option value="planned">Planned</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="blocked">Blocked</option>
-            </select>
-          </Field>
-          <Field label="Work type">
-            <select name="work_type" defaultValue="planned" className={inputCls}>
-              <option value="planned">Planned</option><option value="recurring">Recurring</option><option value="reactive">Reactive</option>
-            </select>
-          </Field>
-          <Field label="Plan focus area">
-            <select name="monthly_focus_area_id" defaultValue="" className={inputCls}>
-              <option value="">— Reactive / operational —</option>
-              {focusAreas.map((area) => <option key={area.id} value={area.id}>{area.objectiveTitle} — {area.title}</option>)}
-            </select>
-          </Field>
-          <div className="flex items-end"><button type="submit" className={btnPrimary}>Add work</button></div>
-        </form>
-      </Card>
-
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
-        {VIEWS.map((name) => <Link key={name} href={`/work?view=${name}`} className={`rounded-lg px-3 py-1.5 text-sm ${view === name ? "bg-navy-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{label(name)}</Link>)}
-      </div>
-
-      <Card title={view === "week" ? "This week’s work" : label(view)}>
-        {items.length === 0 ? (
-          <p className="text-sm text-slate-500">Nothing here yet. Add planned work or log an unexpected task above.</p>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {items.map((item) => (
-              <li key={item.id} className="py-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium text-slate-900">{item.title}</p>
-                      <Badge tone={item.work_type === "reactive" ? "amber" : item.work_type === "recurring" ? "blue" : "slate"}>{item.work_type}</Badge>
-                      <Badge tone={item.status === "completed" ? "green" : item.status === "blocked" ? "red" : item.status === "in_progress" ? "blue" : "slate"}>{label(item.status)}</Badge>
-                      {item.open_blockers > 0 && <Badge tone="red">{item.open_blockers} blocker{item.open_blockers === 1 ? "" : "s"}</Badge>}
-                    </div>
-                    {item.objective_title && <p className="mt-1 text-xs text-slate-500">Objective: {item.objective_title}{item.focus_area ? ` · Focus: ${item.focus_area}` : ""}</p>}
-                    {item.due_date && <p className="mt-1 text-xs text-slate-500">Due {item.due_date}</p>}
-                    {item.latest_update && <p className="mt-2 text-sm text-slate-600">Latest: {item.latest_update}</p>}
-                  </div>
-                  <div className="flex shrink-0 flex-wrap gap-2">
-                    <form action={setWorkStatus}><input type="hidden" name="id" value={item.id} /><input type="hidden" name="status" value="completed" /><button type="submit" className={btnSecondary}>Complete</button></form>
-                    <details className="group">
-                      <summary className={`${btnSecondary} list-none`}>Add update</summary>
-                      <form action={addWorkUpdate} className="mt-2 w-80 space-y-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                        <input type="hidden" name="work_item_id" value={item.id} /><input type="hidden" name="return_to" value="/work" />
-                        <textarea name="text" required rows={2} className={inputCls} placeholder="What changed?" />
-                        <select name="status" defaultValue={item.status} className={inputCls}>{["planned", "in_progress", "blocked", "completed", "deferred"].map((state) => <option key={state} value={state}>{label(state)}</option>)}</select>
-                        <button type="submit" className={btnPrimary}>Save update</button>
-                      </form>
-                    </details>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+      <aside className="space-y-4"><section className="rounded-xl border border-slate-200 bg-white p-5"><div className="flex items-center justify-between"><h2 className="text-xl font-bold tracking-tight text-slate-950">Work Overview</h2><Link href="/weekly" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600">View report <Glyph name="arrow" className="h-4 w-4" /></Link></div><div className="mt-6 grid grid-cols-4 divide-x divide-slate-100 text-center"><Overview icon="clock" tone="slate" value={overview.todo ?? 0} label="To do" /><Overview icon="check" tone="green" value={overview.active ?? 0} label="In progress" /><Overview icon="check" tone="blue" value={overview.complete ?? 0} label="Completed" /><Overview icon="alert" tone="red" value={overview.blocked ?? 0} label="Overdue" /></div></section>
+        <section className="rounded-xl border border-slate-200 bg-white p-5"><h2 className="text-xl font-bold tracking-tight text-slate-950">Your Workload This Week</h2><p className="mt-1 text-sm text-slate-500">Current work distribution</p><div className="mt-5 flex items-end gap-3"><span className="pb-5 text-3xl font-bold tracking-tight text-slate-950">{items.length}</span><span className="pb-5 text-xs text-slate-500">total items</span><div className="ml-auto flex h-24 flex-1 items-end justify-between gap-2">{workloads.map((value, index) => <div key={days[index]} className="flex flex-1 flex-col items-center gap-1"><span className="text-xs font-semibold text-slate-600">{value || ""}</span><div className={`w-full rounded-t-md ${index === now.getDay() - 1 ? "bg-blue-600" : "bg-blue-100"}`} style={{ height: `${Math.max(6, (value / maxWorkload) * 62)}px` }} /><span className="text-[11px] text-slate-500">{days[index]}</span></div>)}</div></div></section>
+        <section className="rounded-xl border border-slate-200 bg-white p-5"><div className="flex items-center justify-between"><div><h2 className="text-xl font-bold tracking-tight text-slate-950">Work Inbox <span className="ml-1 rounded-full bg-red-500 px-2 py-0.5 text-sm text-white">{openReactive.length}</span></h2><p className="mt-1 text-sm text-slate-500">Unplanned items that need attention.</p></div><Link href="/work?view=week&type=reactive" className="text-sm font-medium text-blue-600">View all</Link></div>{openReactive.length === 0 ? <p className="mt-4 text-sm text-slate-500">No reactive work waiting for you.</p> : <div className="mt-4 divide-y divide-slate-100">{openReactive.map((item) => <div key={item.id} className="flex gap-3 py-3"><span className="mt-0.5 rounded-full bg-red-100 p-1 text-red-500"><Glyph name="alert" className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-800">{item.title}</p><p className="mt-0.5 text-xs text-slate-500">Reactive work</p></div><span className="rounded bg-red-50 px-2 py-1 text-[11px] font-medium text-red-600">Reactive</span></div>)}</div>}</section>
+        <section className="rounded-xl border border-slate-200 bg-white p-5"><h2 className="text-xl font-bold tracking-tight text-slate-950">Quick Actions</h2><div className="mt-4 space-y-2"><QuickAdd label="Add new work item" type="planned" focusAreas={focusAreas} /><QuickAdd label="Set up a recurring task" type="recurring" focusAreas={focusAreas} /><Link href="/weekly" className={`${btnSecondary} w-full justify-start gap-3`}><Glyph name="calendar" className="h-5 w-5 text-slate-500" />View weekly report</Link></div></section>
+      </aside>
     </div>
-  );
+  </div>;
 }
+
+function WorkGroup({ type, items, focusAreas }: { type: "planned" | "recurring" | "reactive"; items: ReturnType<typeof listWork>; focusAreas: { id: number; title: string; objectiveTitle: string }[] }) {
+  const meta = { planned: { icon: "calendar" as const, title: "Planned Work", text: "One-off tasks and projects you have planned." }, recurring: { icon: "cycle" as const, title: "Recurring Work", text: "Regular tasks that repeat on a schedule." }, reactive: { icon: "bolt" as const, title: "Reactive Work", text: "Unplanned tasks and issues that arise." } }[type];
+  return <section className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><div className="flex items-center gap-3"><Glyph name={meta.icon} className={`h-6 w-6 ${type === "reactive" ? "text-amber-500" : "text-blue-600"}`} /><div><h2 className="text-xl font-bold tracking-tight text-slate-950">{meta.title} <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-sm font-medium text-slate-600">{items.length}</span></h2><p className="text-sm text-slate-500">{meta.text}</p></div></div><details className="relative"><summary className={`${btnSecondary} list-none gap-2 px-3 py-2`}><Glyph name="plus" className="h-4 w-4 text-blue-600" />Add work</summary><div className="absolute right-0 z-10 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-4 shadow-lg"><WorkForm defaultType={type} focusAreas={focusAreas} /></div></details></div><ul className="divide-y divide-slate-100">{items.map((item) => <WorkRow key={item.id} item={item} />)}</ul></section>;
+}
+
+function WorkRow({ item }: { item: ReturnType<typeof listWork>[number] }) {
+  const progress = item.status === "completed" ? 100 : item.status === "in_progress" ? 55 : item.status === "blocked" ? 25 : 0;
+  return <li className="flex items-center gap-3 px-4 py-3"><span className="h-6 w-6 shrink-0 rounded-md border-2 border-slate-300" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-800">{item.title}</p><p className="truncate text-xs text-slate-500">{item.description || item.latest_update || "No description added yet."}</p><p className="mt-1 flex items-center gap-1 text-xs text-slate-500"><Glyph name="file" className="h-3.5 w-3.5 text-blue-500" />{item.objective_title ?? "Operational work"}</p></div><span className={`hidden rounded-md px-2 py-1 text-xs font-medium lg:inline ${typeStyle[item.work_type]}`}>{item.focus_area ?? titleCase(item.work_type)}</span><span className="hidden items-center gap-1 text-xs text-slate-500 md:flex"><Glyph name="calendar" className="h-4 w-4 text-red-500" />{item.due_date ?? "Today"}</span><span className={`hidden rounded-full px-2.5 py-1 text-xs font-medium md:inline ${item.status === "completed" ? "bg-emerald-50 text-emerald-700" : item.status === "blocked" ? "bg-red-50 text-red-600" : item.status === "in_progress" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{titleCase(item.status)}</span><div className="hidden w-16 xl:block"><span className="text-xs font-semibold text-slate-600">{progress}%</span><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: `${progress}%` }} /></div></div><details className="relative"><summary className={`${btnSecondary} list-none px-3 py-2 text-xs`}>Add update</summary><div className="absolute right-0 z-10 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-lg"><form action={addWorkUpdate} className="space-y-2"><input type="hidden" name="work_item_id" value={item.id} /><input type="hidden" name="return_to" value="/work" /><textarea name="text" required rows={2} className={inputCls} placeholder="What changed?" /><select name="status" defaultValue={item.status} className={inputCls}>{["planned", "in_progress", "blocked", "completed", "deferred"].map((state) => <option key={state} value={state}>{titleCase(state)}</option>)}</select><button type="submit" className={`${btnPrimary} w-full`}>Save update</button></form></div></details><Glyph name="dots" className="h-5 w-5 text-slate-400" /></li>;
+}
+
+function WorkForm({ defaultType, focusAreas }: { defaultType: "planned" | "recurring" | "reactive"; focusAreas: { id: number; title: string; objectiveTitle: string }[] }) { return <form action={createWorkItem} className="space-y-2"><input name="title" required className={inputCls} placeholder="What needs doing?" /><select name="status" defaultValue="in_progress" className={inputCls}><option value="planned">To do</option><option value="in_progress">In progress</option><option value="completed">Completed</option><option value="blocked">Blocked</option></select><input type="hidden" name="work_type" value={defaultType} /><select name="monthly_focus_area_id" defaultValue="" className={inputCls}><option value="">Operational work</option>{focusAreas.map((area) => <option key={area.id} value={area.id}>{area.objectiveTitle} — {area.title}</option>)}</select><button type="submit" className={`${btnPrimary} w-full`}>Add work</button></form>; }
+function Overview({ icon, tone, value, label }: { icon: "clock" | "check" | "alert"; tone: "slate" | "green" | "blue" | "red"; value: number; label: string }) { const styles = { slate: "bg-slate-200 text-slate-500", green: "bg-emerald-100 text-emerald-600", blue: "bg-blue-100 text-blue-600", red: "bg-red-100 text-red-500" }; return <div className="px-2"><span className={`mx-auto flex h-6 w-6 items-center justify-center rounded-full ${styles[tone]}`}><Glyph name={icon} className="h-4 w-4" /></span><p className="mt-2 text-xl font-bold text-slate-900">{value}</p><p className="text-xs text-slate-500">{label}</p></div>; }
+function QuickAdd({ label, type, focusAreas }: { label: string; type: "planned" | "recurring"; focusAreas: { id: number; title: string; objectiveTitle: string }[] }) { return <details className="relative"><summary className={`${btnSecondary} w-full list-none justify-start gap-3`}><Glyph name={type === "recurring" ? "cycle" : "plus"} className="h-5 w-5 text-blue-600" />{label}</summary><div className="absolute right-0 z-10 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-4 shadow-lg"><WorkForm defaultType={type} focusAreas={focusAreas} /></div></details>; }
+function EmptyWork() { return <section className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center"><p className="text-lg font-semibold text-slate-800">No work in this view</p><p className="mt-1 text-sm text-slate-500">Use Add work to plan something or capture an unexpected task.</p></section>; }
