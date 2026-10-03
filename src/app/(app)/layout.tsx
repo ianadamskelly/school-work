@@ -10,7 +10,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const links: NavItem[] = [{ href: "/", label: "Home", icon: "home" }, { href: "/work", label: "Work", icon: "work" }];
   if (user.template_id) {
-    links.push({ href: "/monthly", label: "Objectives", icon: "objectives" }, { href: "/weekly", label: "Reports", icon: "reports" });
+    links.push(
+      { href: "/daily/updates", label: "Daily Updates", icon: "daily" },
+      { href: "/monthly", label: "Objectives", icon: "objectives" },
+      { href: "/weekly", label: "Reports", icon: "reports" },
+      { href: "/reviews", label: "Reviews", icon: "reviews" }
+    );
   }
   if (user.role === "manager" || user.role === "admin") {
     links.push({ href: "/team", label: "Team", icon: "team" });

@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
-export type NavIcon = "home" | "work" | "objectives" | "reports" | "team" | "admin";
-export type NavItem = { href: string; label: string; icon: NavIcon };
+export type NavIcon = "home" | "work" | "objectives" | "reports" | "team" | "admin" | "daily" | "reviews";
+export type NavItem = { href: string; label: string; icon: NavIcon; exact?: boolean };
 
 function NavIconGlyph({ name }: { name: NavIcon }) {
   const shapes: Record<NavIcon, ReactNode> = {
@@ -13,6 +13,8 @@ function NavIconGlyph({ name }: { name: NavIcon }) {
     work: <><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4m-8 6 2.5 2.5L16.5 10" /></>,
     objectives: <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><path d="m12 12 7-7" /></>,
     reports: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 17v-4M12 17V8M16 17v-7" /></>,
+    daily: <><rect x="4" y="4" width="16" height="17" rx="2" /><path d="M8 2v4M16 2v4M8 11h8M8 15h5" /></>,
+    reviews: <><path d="M7 3h8l3 3v15H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" /><path d="M15 3v4h4M8 12h7M8 16h5" /></>,
     team: <><circle cx="9" cy="9" r="3" /><circle cx="16" cy="10" r="2.5" /><path d="M3.5 20c.5-3.3 2.4-5 5.5-5s5 1.7 5.5 5M14 15c3 0 5 1.7 5.5 5" /></>,
     admin: <><circle cx="12" cy="12" r="3" /><path d="M19 13.5v-3l-2.1-.7a5.4 5.4 0 0 0-.7-1.6l1-2-2.1-2.1-2 1a5.4 5.4 0 0 0-1.6-.7L10.5 2h-3l-.7 2.1a5.4 5.4 0 0 0-1.6.7l-2-1-2.1 2.1 1 2a5.4 5.4 0 0 0-.7 1.6L.5 10.5v3l2.1.7a5.4 5.4 0 0 0 .7 1.6l-1 2L4.4 20l2-1a5.4 5.4 0 0 0 1.6.7l.7 2.1h3l.7-2.1a5.4 5.4 0 0 0 1.6-.7l2 1 2.1-2.1-1-2a5.4 5.4 0 0 0 .7-1.6z" /></>,
   };
@@ -24,7 +26,7 @@ export function AppShellNav({ items }: { items: NavItem[] }) {
   return (
     <nav className="space-y-1" aria-label="Main navigation">
       {items.map((item) => {
-        const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const active = item.exact || item.href === "/" ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + "/");
         return (
           <Link
             key={item.href}

@@ -5,7 +5,7 @@ import { requireSessionUser } from "@/lib/auth";
 import { reviewMonthly, approveMonthlyPlan, requestMonthlyPlanChanges } from "@/lib/actions";
 import { todayISO, MONTH_NAMES } from "@/lib/rotation";
 import { getMonthlyWorkObjectives } from "@/lib/planning";
-import { Card, Field, PageHeader, Badge, SavedNotice, inputCls, btnPrimary } from "@/components/ui";
+import { Card, Field, Badge, SavedNotice, inputCls, btnPrimary } from "@/components/ui";
 
 type Person = { id: number; name: string; job_title: string; manager_id: number | null; template_id: number | null };
 type PlanRow = { id: number; year: number; month: number; status: string; manager_feedback: string; submitted_at: string | null };
@@ -92,12 +92,25 @@ export default async function PersonPage({
     )
     .all(person.id) as LogRow[];
 
-  const isOverdue = (l: LogRow) =>
-    l.followup_required === 1 && l.status !== "Completed" && !!l.followup_date && l.followup_date < today;
+ const isOverdue = (l: LogRow) =>
+   l.followup_required === 1 && l.status !== "Completed" && !!l.followup_date && l.followup_date < today;
+  const completedLogs = logs.filter((log) => log.status === "Completed").length;
+  const submittedWeeks = weeks.filter((week) => week.status !== "draft").length;
+  const progressWeeks = weeks.filter((week) => week.progress_percent != null);
+  const averageProgress = progressWeeks.length ? Math.round(progressWeeks.reduce((total, week) => total + (week.progress_percent || 0), 0) / progressWeeks.length) : null;
 
-  return (
-    <div className="space-y-6">
-      <PageHeader title={person.name} subtitle={person.job_title || undefined} />
+ return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-center gap-4"><span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100 text-2xl font-bold text-blue-700">{person.name.charAt(0)}</span><div><Link href="/team" className="text-sm font-medium text-blue-600 hover:text-blue-700">← Back to team</Link><h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">{person.name}</h1><p className="mt-1 text-base text-slate-500">{person.job_title || "Team member"} · monthly planning, weekly reporting and review</p></div></div>
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-right"><p className="text-sm font-semibold text-emerald-800">{currentPlan?.status === "approved" ? "Plan approved" : currentPlan?.submitted_at ? "Plan awaiting review" : "Planning in progress"}</p><p className="mt-1 text-xs text-emerald-700">{MONTH_NAMES[month - 1]} {year}</p></div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"><p className="text-xs font-medium text-slate-500">Monthly objectives</p><p className="mt-1 text-2xl font-bold text-slate-950">{planObjectives.length}</p><p className="mt-1 text-xs text-blue-600">Current plan</p></div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"><p className="text-xs font-medium text-slate-500">Weekly reports</p><p className="mt-1 text-2xl font-bold text-slate-950">{submittedWeeks}</p><p className="mt-1 text-xs text-violet-600">Recent submissions</p></div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"><p className="text-xs font-medium text-slate-500">Daily work complete</p><p className="mt-1 text-2xl font-bold text-slate-950">{completedLogs}/{logs.length}</p><p className="mt-1 text-xs text-emerald-600">Latest activity</p></div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"><p className="text-xs font-medium text-slate-500">Reported progress</p><p className="mt-1 text-2xl font-bold text-slate-950">{averageProgress == null ? "—" : averageProgress + "%"}</p><p className="mt-1 text-xs text-amber-600">From weekly reports</p></div>
+      </div>
       <SavedNotice show={query.approved === "1"} text="Plan approved — their planned work can now be linked to its focus areas." />
       <SavedNotice show={query.feedback === "1"} text="Feedback sent — they can revise and resubmit their plan." />
       <SavedNotice show={query.commented === "1"} text="Comment saved — the weekly report is marked as seen." />
