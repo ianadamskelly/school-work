@@ -3,6 +3,9 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
+import fs from "fs";
+import path from "path";
+import { randomUUID } from "crypto";
 import { getDb } from "./db";
 import { createSession, destroySession, getSessionUser } from "./auth";
 
@@ -60,7 +63,7 @@ export async function addDailyLog(formData: FormData) {
   const workType = requestedType === "recurring" || requestedType === "reactive" ? requestedType : "planned";
   const focusId = numOrNull(formData.get("monthly_focus_area_id"));
   const outcome = String(formData.get("outcome") ?? "").trim();
-  db.transaction(() => {
+  const dailyUpdateId = db.transaction(() => {
     const logId = Number(db.prepare("INSERT INTO daily_logs (user_id, log_date, category_id, activity, department_id, hours, outcome, followup_required, followup_date, priority, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
       user.id,
       logDate,
@@ -85,8 +88,9 @@ export async function addDailyLog(formData: FormData) {
       strategicObjectiveId = focus.strategic_objective_id;
     }
     const itemId = Number(db.prepare("INSERT INTO work_items (user_id, monthly_plan_id, monthly_objective_id, monthly_focus_area_id, objective_id, work_type, title, description, status, due_date, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'completed' THEN datetime('now') ELSE NULL END)").run(user.id, monthlyPlanId, monthlyObjectiveId, focusId, strategicObjectiveId, workType, activity, outcome, workStatus, logDate, workStatus).lastInsertRowid);
-    db.prepare("INSERT INTO work_updates (user_id, work_item_id, update_date, text, status_after, legacy_daily_log_id) VALUES (?, ?, ?, ?, ?, ?)").run(user.id, itemId, logDate, outcome ? activity + ": " + outcome : activity, workStatus, logId);
+    return Number(db.prepare("INSERT INTO work_updates (user_id, work_item_id, update_date, text, status_after, legacy_daily_log_id) VALUES (?, ?, ?, ?, ?, ?)").run(user.id, itemId, logDate, outcome ? activity + ": " + outcome : activity, workStatus, logId).lastInsertRowid);
   })();
+  await saveEvidence(db, formData, dailyUpdateId);
   revalidatePath("/daily");
   revalidatePath("/daily/updates");
   revalidatePath("/");
@@ -761,9 +765,9 @@ export async function addWorkUpdate(formData: FormData) {
          VALUES (?, 'reactive', ?, ?, CASE WHEN ? = 'completed' THEN datetime('now') ELSE NULL END)`
       ).run(user.id, text, status || "completed", status || "completed").lastInsertRowid);
     }
-    db.prepare(
+    const updateId = Number(db.prepare(
       "INSERT INTO work_updates (user_id, work_item_id, update_date, text, status_after) VALUES (?, ?, ?, ?, ?)"
-    ).run(user.id, itemId, str(formData, "update_date") || new Date().toISOString().slice(0, 10), text, status || null);
+    ).run(user.id, itemId, str(formData, "update_date") || new Date().toISOString().slice(0, 10), text, status || null).lastInsertRowid);
     if (status) {
       db.prepare("UPDATE work_items SET status = ?, completed_at = CASE WHEN ? = 'completed' THEN datetime('now') ELSE completed_at END, updated_at = datetime('now') WHERE id = ?")
         .run(status, status, itemId);
@@ -774,8 +778,10 @@ export async function addWorkUpdate(formData: FormData) {
       ).run(itemId, user.id, str(formData, "blocker_description") || text, str(formData, "blocker_severity") || "needs_attention");
       db.prepare("UPDATE work_items SET status = 'blocked', updated_at = datetime('now') WHERE id = ?").run(itemId);
     }
+    return updateId;
   });
-  save();
+  const updateId = save();
+  await saveEvidence(db, formData, updateId);
   revalidatePath("/");
   revalidatePath("/work");
   revalidatePath("/weekly");
@@ -811,4 +817,18 @@ function numOrNull(value: FormDataEntryValue | null): number | null {
 
 function str(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
+}
+
+async function saveEvidence(db: ReturnType<typeof getDb>, formData: FormData, workUpdateId: number) {
+  const file = formData.get("evidence");
+  if (!(file instanceof File) || file.size === 0) return;
+  const allowed = new Set(["image/png", "image/jpeg", "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
+  if (!allowed.has(file.type) || file.size > 10 * 1024 * 1024) return;
+  const extension = path.extname(file.name).toLowerCase().replace(/[^.a-z0-9]/g, "") || ".bin";
+  const storedName = randomUUID() + extension;
+  const directory = path.join(process.cwd(), "data", "evidence");
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(path.join(directory, storedName), Buffer.from(await file.arrayBuffer()));
+  db.prepare("INSERT INTO work_evidence (work_update_id, original_name, stored_name, mime_type, byte_size) VALUES (?, ?, ?, ?, ?)")
+    .run(workUpdateId, path.basename(file.name).slice(0, 180), storedName, file.type, file.size);
 }

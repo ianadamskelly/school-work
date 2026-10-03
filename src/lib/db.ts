@@ -262,6 +262,17 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_work_updates_user_date ON work_updates(user_id, update_date);
     CREATE INDEX IF NOT EXISTS idx_work_updates_item_date ON work_updates(work_item_id, update_date);
 
+    CREATE TABLE IF NOT EXISTS work_evidence (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      work_update_id INTEGER NOT NULL REFERENCES work_updates(id) ON DELETE CASCADE,
+      original_name TEXT NOT NULL,
+      stored_name TEXT NOT NULL UNIQUE,
+      mime_type TEXT NOT NULL,
+      byte_size INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_work_evidence_update ON work_evidence(work_update_id);
+
     CREATE TABLE IF NOT EXISTS blockers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       work_item_id INTEGER REFERENCES work_items(id) ON DELETE SET NULL,
