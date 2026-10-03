@@ -3,158 +3,53 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
 import { createUser, updateUser } from "@/lib/actions";
-import { Card, Field, PageHeader, Badge, SavedNotice, inputCls, btnPrimary, btnSecondary } from "@/components/ui";
 
-type UserRow = {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  job_title: string;
-  manager_id: number | null;
-  template_id: number | null;
-  active: number;
-};
+type Person = { id: number; name: string; email: string; role: string; job_title: string; manager_id: number | null; manager_name: string | null; template_id: number | null; template_name: string | null; active: number };
 type Option = { id: number; name: string };
 
-export default async function AdminPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ saved?: string; error?: string }>;
-}) {
-  const user = await requireSessionUser();
-  if (user.role !== "admin") redirect("/");
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string; q?: string; selected?: string }> }) {
+  const viewer = await requireSessionUser();
+  if (viewer.role !== "admin") redirect("/");
   const params = await searchParams;
   const db = getDb();
-
-  const users = db
-    .prepare("SELECT id, name, email, role, job_title, manager_id, template_id, active FROM users ORDER BY name")
-    .all() as UserRow[];
-  const managers = users.filter((u) => u.role === "manager" || u.role === "admin");
+  let people = db.prepare("SELECT u.id, u.name, u.email, u.role, u.job_title, u.manager_id, manager.name AS manager_name, u.template_id, t.name AS template_name, u.active FROM users u LEFT JOIN users manager ON manager.id = u.manager_id LEFT JOIN templates t ON t.id = u.template_id ORDER BY u.active DESC, u.name").all() as Person[];
+  if (params.q) {
+    const q = params.q.toLowerCase();
+    people = people.filter((p) => (p.name + " " + p.email + " " + p.job_title + " " + (p.template_name ?? "")).toLowerCase().includes(q));
+  }
+  const managers = people.filter((p) => p.role === "manager" || p.role === "admin");
   const templates = db.prepare("SELECT id, name FROM templates ORDER BY name").all() as Option[];
+  const selected = people.find((p) => p.id === Number(params.selected)) ?? people[0];
+  const active = people.filter((p) => p.active).length;
+  const departments = new Set(people.map((p) => p.template_name).filter(Boolean)).size;
 
-  return (
-    <div className="space-y-6">
-      <PageHeader title="Admin" subtitle="Add people, set who reports to whom, and manage role templates." />
-      <SavedNotice show={params.saved === "1"} />
-      {params.error === "email" && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
-          That email address is already in use.
-        </div>
-      )}
-      {params.error === "invalid" && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
-          Please fill in a name, an email, and a password of at least 6 characters.
-        </div>
-      )}
-
-      <Card title="Role templates">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-slate-600">
-            {templates.length} template{templates.length === 1 ? "" : "s"}: {templates.map((t) => t.name).join(", ") || "none yet"}
-          </p>
-          <Link href="/admin/templates" className={btnSecondary}>Manage templates</Link>
-        </div>
-      </Card>
-
-      <Card title="Add a person">
-        <form action={createUser} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Full name">
-            <input name="name" required className={inputCls} />
-          </Field>
-          <Field label="Email">
-            <input name="email" type="email" required className={inputCls} />
-          </Field>
-          <Field label="Temporary password" hint="At least 6 characters. Share it with them privately; you can reset it later.">
-            <input name="password" required minLength={6} className={inputCls} />
-          </Field>
-          <Field label="Job title">
-            <input name="job_title" className={inputCls} placeholder="e.g. PYP Teacher" />
-          </Field>
-          <Field label="Role in the system">
-            <select name="role" defaultValue="employee" className={inputCls}>
-              <option value="employee">Employee</option>
-              <option value="manager">Line manager</option>
-              <option value="admin">Admin</option>
-            </select>
-          </Field>
-          <Field label="Reports to">
-            <select name="manager_id" defaultValue="" className={inputCls}>
-              <option value="">— Nobody —</option>
-              {managers.map((m) => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Role template" hint="What their work is logged against. Line managers who also track their own work need one too.">
-            <select name="template_id" defaultValue="" className={inputCls}>
-              <option value="">— None —</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          </Field>
-          <div className="flex items-end">
-            <button type="submit" className={btnPrimary}>Add person</button>
-          </div>
-        </form>
-      </Card>
-
-      <Card title="Everyone">
-        <div className="space-y-3">
-          {users.map((u) => (
-            <details key={u.id} className="rounded-lg border border-slate-200">
-              <summary className="flex cursor-pointer flex-wrap items-center gap-2 px-4 py-3">
-                <span className="font-medium text-slate-900">{u.name}</span>
-                <span className="text-sm text-slate-500">{u.email}</span>
-                <Badge tone={u.role === "admin" ? "red" : u.role === "manager" ? "blue" : "slate"}>{u.role}</Badge>
-                {!u.active && <Badge tone="amber">deactivated</Badge>}
-              </summary>
-              <form action={updateUser} className="grid grid-cols-1 gap-4 border-t border-slate-100 p-4 sm:grid-cols-2">
-                <input type="hidden" name="id" value={u.id} />
-                <Field label="Role in the system">
-                  <select name="role" defaultValue={u.role} className={inputCls}>
-                    <option value="employee">Employee</option>
-                    <option value="manager">Line manager</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </Field>
-                <Field label="Job title">
-                  <input name="job_title" defaultValue={u.job_title} className={inputCls} />
-                </Field>
-                <Field label="Reports to">
-                  <select name="manager_id" defaultValue={u.manager_id ?? ""} className={inputCls}>
-                    <option value="">— Nobody —</option>
-                    {managers
-                      .filter((m) => m.id !== u.id)
-                      .map((m) => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                      ))}
-                  </select>
-                </Field>
-                <Field label="Role template">
-                  <select name="template_id" defaultValue={u.template_id ?? ""} className={inputCls}>
-                    <option value="">— None —</option>
-                    {templates.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Reset password (leave blank to keep current)">
-                  <input name="new_password" className={inputCls} placeholder="New password" />
-                </Field>
-                <div className="flex items-end justify-between gap-4">
-                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                    <input name="active" type="checkbox" defaultChecked={u.active === 1} className="h-4 w-4 rounded border-slate-300" />
-                    Active account
-                  </label>
-                  <button type="submit" className={btnPrimary}>Save changes</button>
-                </div>
-              </form>
-            </details>
-          ))}
-        </div>
-      </Card>
+  return <div className="space-y-5">
+    <header className="flex flex-wrap justify-between gap-4"><div><h1 className="text-[40px] font-bold leading-none tracking-[-.045em] text-slate-950">People &amp; Roles</h1><p className="mt-2 text-[17px] text-slate-500">Configure users, reporting lines, and role templates.</p></div><div className="hidden rounded-xl bg-slate-100 px-5 py-3 text-sm italic text-slate-500 lg:block"><span className="mr-3 text-2xl text-amber-500">☼</span>“Great teams build great schools.”</div></header>
+    {params.saved === "1" && <Notice tone="green">Changes saved.</Notice>}
+    {params.error === "email" && <Notice tone="red">That email address is already in use.</Notice>}
+    {params.error === "invalid" && <Notice tone="red">Enter a name, email, and password of at least 6 characters.</Notice>}
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Stat symbol="♟" value={people.length} label="Total users" note="People in your workspace" /><Stat symbol="✓" value={active} label="Active users" note={(people.length ? Math.round(active / people.length * 100) : 0) + "% of total"} tone="green" /><Stat symbol="⌂" value={departments} label="Departments" note="From role templates" /><Stat symbol="▱" value={templates.length} label="Role templates" note="Available work roles" tone="violet" /></div>
+    <nav className="flex gap-7 border-b border-slate-200"><span className="border-b-2 border-blue-600 px-4 py-3 text-sm font-semibold text-blue-600">People</span><Link href="/admin/templates" className="px-4 py-3 text-sm font-medium text-slate-500">Role templates</Link><span className="px-4 py-3 text-sm font-medium text-slate-500">Organisation chart</span></nav>
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 p-4"><div><h2 className="text-xl font-bold text-slate-950">People ({people.length})</h2><p className="mt-1 text-sm text-slate-500">Manage users, assign roles, and set reporting lines.</p></div><Invite managers={managers} templates={templates} /></div>
+      <form className="grid gap-3 border-b border-slate-100 bg-slate-50 p-4 sm:grid-cols-[1.5fr_.75fr_.75fr]"><div className="relative"><span className="absolute left-3 top-3 text-slate-400">⌕</span><input name="q" defaultValue={params.q} placeholder="Search people by name, role, or department..." className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none" /></div><select className="rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-600"><option>All departments</option></select><select className="rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-600"><option>All status</option></select></form>
+      <div className="overflow-x-auto"><table className="w-full min-w-[800px] text-left"><thead className="border-b border-slate-100 text-xs text-slate-500"><tr><th className="px-4 py-4"><input type="checkbox" aria-label="Select all" /></th><th>Name　↑</th><th>Role Template</th><th>Permission Role</th><th>Department</th><th>Line Manager</th><th>Status</th><th /></tr></thead><tbody>{people.map((p) => <PersonRow key={p.id} person={p} selected={selected?.id === p.id} />)}</tbody></table></div><div className="p-4 text-sm text-slate-500">Showing 1–{people.length} of {people.length} people</div></section>
+      <aside>{selected ? <PersonPanel person={selected} managers={managers} templates={templates} /> : <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">No users created yet.</div>}</aside>
     </div>
-  );
+  </div>;
 }
+
+function Invite({ managers, templates }: { managers: Person[]; templates: Option[] }) {
+  return <details className="relative"><summary className="cursor-pointer list-none rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white">＋ Invite user</summary><form action={createUser} className="absolute right-0 top-12 z-20 grid w-[min(440px,calc(100vw-3rem))] gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-xl sm:grid-cols-2"><input name="name" required placeholder="Full name" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" /><input name="email" type="email" required placeholder="Email address" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" /><input name="password" type="password" minLength={6} required placeholder="Temporary password" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" /><input name="job_title" placeholder="Job title" className="rounded-lg border border-slate-200 px-3 py-2 text-sm" /><select name="role" className="rounded-lg border border-slate-200 px-3 py-2 text-sm"><option value="employee">Standard</option><option value="manager">Line manager</option><option value="admin">Administrator</option></select><select name="manager_id" className="rounded-lg border border-slate-200 px-3 py-2 text-sm"><option value="">No line manager</option>{managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select><select name="template_id" className="rounded-lg border border-slate-200 px-3 py-2 text-sm"><option value="">No role template</option>{templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select><button className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white">Invite user</button></form></details>;
+}
+function PersonRow({ person, selected }: { person: Person; selected: boolean }) {
+  const role = person.role === "admin" ? "Administrator" : person.role === "manager" ? "Manager" : "Standard";
+  const roleTone = person.role === "admin" ? "bg-violet-50 text-violet-700" : person.role === "manager" ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-600";
+  return <tr className={"border-b border-slate-100 last:border-0 " + (selected ? "bg-blue-50/70" : "")}><td className="px-4 py-3"><input type="checkbox" aria-label={"Select " + person.name} /></td><td className="py-3"><Link href={"/admin?selected=" + person.id} className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-600">{person.name.charAt(0)}</span><span><strong className="block text-sm text-slate-800">{person.name}</strong><span className="block text-xs text-slate-400">{person.email}</span></span></Link></td><td className="py-3"><span className="rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-600">{person.template_name || "Unassigned"}</span></td><td className="py-3"><span className={"rounded-md px-2 py-1 text-xs " + roleTone}>{role}</span></td><td className="py-3 text-xs text-slate-500">{person.template_name || "—"}</td><td className="py-3 text-xs text-slate-500">{person.manager_name || "—"}</td><td className="py-3"><span className={"rounded-full px-2 py-1 text-xs " + (person.active ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")}>● {person.active ? "Active" : "Inactive"}</span></td><td className="py-3 text-slate-400">•••</td></tr>;
+}
+function PersonPanel({ person, managers, templates }: { person: Person; managers: Person[]; templates: Option[] }) {
+  return <section className="rounded-xl border border-slate-200 bg-white p-5"><div className="flex justify-between"><Link href="/admin" className="text-sm font-medium text-blue-600">‹ Back</Link><span className="text-sm text-blue-600">✎ Edit template</span></div><div className="mt-5 flex gap-3"><span className="flex h-14 w-14 items-center justify-center rounded-xl bg-blue-50 text-xl font-bold text-blue-600">{person.name.charAt(0)}</span><div><h2 className="text-2xl font-bold tracking-[-.035em] text-slate-950">{person.job_title || person.name}</h2><span className="mt-1 inline-block rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-600">{person.template_name || "No role template"}</span><p className="mt-2 text-sm leading-5 text-slate-500">Configure this person&apos;s account, reporting line and role template.</p></div></div><form action={updateUser} className="mt-6 space-y-4"><input type="hidden" name="id" value={person.id} /><Info label="Department" value={person.template_name || "Not assigned"} /><Info label="Typical reporting line" value={person.manager_name ? "Reports to " + person.manager_name : "No line manager"} /><label className="block text-sm font-semibold text-slate-700">Permission role<select name="role" defaultValue={person.role} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"><option value="employee">Standard</option><option value="manager">Line manager</option><option value="admin">Administrator</option></select></label><label className="block text-sm font-semibold text-slate-700">Job title<input name="job_title" defaultValue={person.job_title} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" /></label><label className="block text-sm font-semibold text-slate-700">Line manager<select name="manager_id" defaultValue={person.manager_id ?? ""} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"><option value="">No line manager</option>{managers.filter((m) => m.id !== person.id).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label><label className="block text-sm font-semibold text-slate-700">Role template<select name="template_id" defaultValue={person.template_id ?? ""} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"><option value="">No role template</option>{templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label><input name="new_password" type="password" minLength={6} placeholder="Reset password (optional)" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" /><label className="flex items-center gap-2 text-sm text-slate-600"><input name="active" type="checkbox" defaultChecked={person.active === 1} />Active account</label><button className="w-full rounded-lg bg-blue-600 py-3 text-sm font-semibold text-white">Save changes</button></form><h3 className="mt-7 font-bold text-slate-900">Role template</h3><p className="mt-2 text-sm leading-5 text-slate-500">Role templates define workstreams and recurring responsibilities for staff.</p><Link href="/admin/templates" className="mt-4 inline-block text-sm font-medium text-blue-600">Manage role templates →</Link></section>;
+}
+function Stat({ symbol, value, label, note, tone = "blue" }: { symbol: string; value: number; label: string; note: string; tone?: "blue" | "green" | "violet" }) { const color = tone === "green" ? "bg-emerald-50 text-emerald-600" : tone === "violet" ? "bg-violet-50 text-violet-600" : "bg-blue-50 text-blue-600"; return <section className="rounded-xl border border-slate-200 bg-white p-5"><div className="flex gap-3"><span className={"flex h-12 w-12 items-center justify-center rounded-full text-2xl " + color}>{symbol}</span><span><strong className="block text-2xl text-slate-950">{value}</strong><span className="text-sm text-slate-500">{label}</span></span></div><p className="mt-3 text-xs text-slate-400">{note}</p></section>; }
+function Info({ label, value }: { label: string; value: string }) { return <p className="flex justify-between gap-4 text-sm"><span className="text-slate-400">{label}</span><span className="text-right text-slate-700">{value}</span></p>; }
+function Notice({ tone, children }: { tone: "green" | "red"; children: React.ReactNode }) { return <div className={"rounded-xl border px-4 py-3 text-sm " + (tone === "green" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700")}>{children}</div>; }
