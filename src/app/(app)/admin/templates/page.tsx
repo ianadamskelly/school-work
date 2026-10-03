@@ -3,58 +3,37 @@ import { redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
 import { createTemplate } from "@/lib/actions";
-import { Card, Field, PageHeader, inputCls, btnPrimary } from "@/components/ui";
 
-type TemplateRow = { id: number; name: string; description: string; people: number; categories: number };
+type Template = { id: number; name: string; description: string; people: number; responsibilities: number; workstreams: number };
+type Detail = { name: string; description: string; people: number; departments: string; responsibilities: string[]; workstreams: string[] };
 
-export default async function TemplatesPage() {
-  const user = await requireSessionUser();
-  if (user.role !== "admin") redirect("/");
-  const db = getDb();
-
-  const templates = db
-    .prepare(
-      `SELECT t.id, t.name, t.description,
-        (SELECT COUNT(*) FROM users u WHERE u.template_id = t.id AND u.active = 1) AS people,
-        (SELECT COUNT(*) FROM task_categories tc WHERE tc.template_id = t.id) AS categories
-       FROM templates t ORDER BY t.name`
-    )
-    .all() as TemplateRow[];
-
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Role templates"
-        subtitle="A template is a job description broken into task categories, focus areas, and monthly TOR areas. Build it once, assign it to everyone with that role."
-      />
-
-      <Card title="Create a template">
-        <form action={createTemplate} className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_2fr_auto]">
-          <Field label="Role name">
-            <input name="name" required className={inputCls} placeholder="e.g. PYP Teacher" />
-          </Field>
-          <Field label="Short description">
-            <input name="description" className={inputCls} placeholder="What this role covers" />
-          </Field>
-          <div className="flex items-end">
-            <button type="submit" className={btnPrimary}>Create</button>
-          </div>
-        </form>
-      </Card>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {templates.map((t) => (
-          <Link key={t.id} href={`/admin/templates/${t.id}`} className="block">
-            <Card className="h-full transition hover:border-navy-600">
-              <p className="font-semibold text-slate-900">{t.name}</p>
-              {t.description && <p className="mt-1 text-sm text-slate-600">{t.description}</p>}
-              <p className="mt-3 text-xs text-slate-500">
-                {t.categories} task categories · {t.people} {t.people === 1 ? "person" : "people"} assigned
-              </p>
-            </Card>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
+export default async function TemplatesPage({ searchParams }: { searchParams: Promise<{ selected?: string; q?: string }> }) {
+  const user = await requireSessionUser(); if (user.role !== "admin") redirect("/");
+  const params = await searchParams; const db = getDb();
+  let templates = db.prepare("SELECT t.id, t.name, t.description, (SELECT COUNT(*) FROM users u WHERE u.template_id = t.id AND u.active = 1) AS people, (SELECT COUNT(*) FROM task_categories tc WHERE tc.template_id = t.id) AS responsibilities, (SELECT COUNT(*) FROM focus_areas fa WHERE fa.template_id = t.id) AS workstreams FROM templates t ORDER BY t.name").all() as Template[];
+  if (params.q) { const q = params.q.toLowerCase(); templates = templates.filter((item) => (item.name + " " + item.description).toLowerCase().includes(q)); }
+  const selected = templates.find((item) => item.id === Number(params.selected)) ?? templates[0];
+  const detail = selected ? getDetail(selected.id) : null;
+  const totalResponsibilities = templates.reduce((sum, item) => sum + item.responsibilities, 0);
+  const totalWorkstreams = templates.reduce((sum, item) => sum + item.workstreams, 0);
+  return <div className="space-y-5">
+    <header className="flex flex-wrap justify-between gap-4"><div><h1 className="text-[40px] font-bold leading-none tracking-[-.045em] text-slate-950">Role Templates</h1><p className="mt-2 text-[17px] text-slate-500">Create and manage reusable job-role templates with default responsibilities and workstreams.</p></div><div className="hidden rounded-xl bg-slate-100 px-5 py-3 text-sm italic text-slate-500 lg:block"><span className="mr-3 text-2xl text-amber-500">☼</span>“Clear roles help great<br />teams do great work.”</div></header>
+    <div className="grid gap-4 lg:grid-cols-4"><Stat symbol="▱" value={templates.length} label="Role templates" note="Reusable job roles" /><Stat symbol="⌁" value={totalResponsibilities} label="Total responsibilities" note="Across all templates" tone="violet" /><Stat symbol="▱" value={totalWorkstreams} label="Default workstreams" note="Focus areas configured" /><CreateTemplate /></div>
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_450px]"><section className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="border-b border-slate-100 p-4"><h2 className="text-xl font-bold text-slate-950">Role Templates ({templates.length})</h2><p className="mt-1 text-sm text-slate-500">Reusable job-role templates with default responsibilities and workstreams.</p><form className="mt-4 grid gap-3 sm:grid-cols-[1.5fr_.7fr]"><div className="relative"><span className="absolute left-3 top-3 text-slate-400">⌕</span><input name="q" defaultValue={params.q} placeholder="Search role templates by name or description..." className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none" /></div><select className="rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-600"><option>All categories</option></select></form></div><div className="divide-y divide-slate-100">{templates.map((item, index) => <Link key={item.id} href={"/admin/templates?selected=" + item.id} className={"flex items-center gap-4 px-4 py-4 hover:bg-slate-50 " + (selected?.id === item.id ? "bg-blue-50/70 ring-1 ring-inset ring-blue-500" : "")}><span className={"flex h-11 w-11 items-center justify-center rounded-xl text-xl " + tone(index)}>{symbol(index)}</span><span className="min-w-0 flex-1"><strong className="block text-sm text-slate-900">{item.name}</strong><span className="mt-1 block truncate text-xs text-slate-500">{item.description || "Reusable work role template"}</span></span><span className={"rounded-md px-2 py-1 text-xs " + tone(index)}>{item.responsibilities} responsibilities</span><span className="text-slate-400">•••</span></Link>)}</div></section>
+    <aside>{selected && detail ? <TemplateDetail template={selected} detail={detail} /> : <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">Create a role template to begin.</div>}</aside></div>
+  </div>;
 }
+
+function getDetail(id: number): Detail {
+  const db = getDb();
+  const template = db.prepare("SELECT t.name, t.description, (SELECT COUNT(*) FROM users u WHERE u.template_id = t.id AND u.active = 1) AS people, COALESCE((SELECT group_concat(name, ', ') FROM departments d WHERE d.template_id = t.id), '') AS departments FROM templates t WHERE t.id = ?").get(id) as { name: string; description: string; people: number; departments: string };
+  const responsibilities = db.prepare("SELECT name FROM task_categories WHERE template_id = ? ORDER BY sort LIMIT 8").all(id) as { name: string }[];
+  const workstreams = db.prepare("SELECT name FROM focus_areas WHERE template_id = ? ORDER BY sort LIMIT 8").all(id) as { name: string }[];
+  return { ...template, responsibilities: responsibilities.map((item) => item.name), workstreams: workstreams.map((item) => item.name) };
+}
+function TemplateDetail({ template, detail }: { template: Template; detail: Detail }) { return <section className="rounded-xl border border-slate-200 bg-white p-5"><div className="flex justify-between"><Link href="/admin/templates" className="text-sm font-medium text-blue-600">‹ Back to templates</Link><div className="flex gap-2"><button className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600">▣ Duplicate</button><Link href={"/admin/templates/" + template.id} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white">✎ Edit template</Link></div></div><div className="mt-5 flex gap-3"><span className="flex h-14 w-14 items-center justify-center rounded-xl bg-blue-50 text-2xl text-blue-600">▣</span><div><h2 className="text-2xl font-bold tracking-[-.035em] text-slate-950">{detail.name}</h2><p className="mt-1 text-sm leading-5 text-slate-500">{detail.description || "Define reusable responsibilities, workstreams and reporting context for this role."}</p><span className="mt-2 inline-block rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-600">{template.responsibilities} responsibilities</span></div></div><h3 className="mt-7 font-bold text-slate-900">Key information</h3><div className="mt-3 space-y-3"><Info label="Category" value={detail.departments || "Role template"} /><Info label="Typical reporting line" value="Set when assigned to a person" /><Info label="Common in departments" value={detail.departments || "Not set"} /><Info label="Used by" value={detail.people + " active people"} /></div><div className="mt-6 border-t border-slate-100 pt-5"><div className="flex justify-between"><h3 className="font-bold text-slate-900">Default responsibilities ({template.responsibilities})</h3><Link href={"/admin/templates/" + template.id} className="text-sm text-blue-600">View all →</Link></div><ol className="mt-4 space-y-2">{detail.responsibilities.length ? detail.responsibilities.slice(0, 5).map((item, index) => <li key={item} className="flex gap-3 text-sm text-slate-500"><i className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs not-italic text-slate-600">{index + 1}</i>{item}</li>) : <li className="text-sm text-slate-500">No responsibilities have been added yet.</li>}</ol></div><div className="mt-6 border-t border-slate-100 pt-5"><div className="flex justify-between"><h3 className="font-bold text-slate-900">Default workstreams ({template.workstreams})</h3><Link href={"/admin/templates/" + template.id} className="text-sm text-blue-600">View all →</Link></div><div className="mt-4 flex flex-wrap gap-2">{detail.workstreams.length ? detail.workstreams.map((item, index) => <span key={item} className={"rounded-md px-3 py-1.5 text-xs " + tone(index)}>{item}</span>) : <span className="text-sm text-slate-500">No workstreams have been added yet.</span>}</div></div></section>; }
+function CreateTemplate() { return <details className="relative"><summary className="flex h-full cursor-pointer list-none items-center justify-center rounded-xl bg-blue-600 p-5 text-sm font-semibold text-white">＋　Create template</summary><form action={createTemplate} className="absolute right-0 top-24 z-20 grid w-[min(420px,calc(100vw-3rem))] gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-xl"><input name="name" required placeholder="Role template name" className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm" /><textarea name="description" rows={3} placeholder="Short role description" className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm" /><button className="rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white">Create template</button></form></details>; }
+function Stat({ symbol, value, label, note, tone: color = "blue" }: { symbol: string; value: number; label: string; note: string; tone?: "blue" | "violet" }) { return <section className="rounded-xl border border-slate-200 bg-white p-5"><div className="flex gap-3"><span className={"flex h-12 w-12 items-center justify-center rounded-full text-2xl " + (color === "violet" ? "bg-violet-50 text-violet-600" : "bg-blue-50 text-blue-600")}>{symbol}</span><span><strong className="block text-2xl text-slate-950">{value}</strong><span className="text-sm text-slate-500">{label}</span></span></div><p className="mt-3 text-xs text-slate-400">{note}</p></section>; }
+function Info({ label, value }: { label: string; value: string }) { return <p className="flex justify-between gap-4 text-sm"><span className="text-slate-400">{label}</span><span className="text-right text-slate-700">{value}</span></p>; }
+function tone(index: number) { return ["bg-blue-50 text-blue-600", "bg-violet-50 text-violet-600", "bg-emerald-50 text-emerald-600", "bg-amber-50 text-amber-600", "bg-red-50 text-red-500"][index % 5]; }
+function symbol(index: number) { return ["▣", "♟", "⚙", "▤", "◉"][index % 5]; }
