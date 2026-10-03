@@ -28,6 +28,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     {params.saved === "1" && <Notice tone="green">Changes saved.</Notice>}
     {params.error === "email" && <Notice tone="red">That email address is already in use.</Notice>}
     {params.error === "invalid" && <Notice tone="red">Enter a name, email, and password of at least 6 characters.</Notice>}
+    {params.error === "reporting" && <Notice tone="red">Choose an active line manager and keep reporting lines free of circular relationships.</Notice>}
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Stat symbol="♟" value={people.length} label="Total users" note="People in your workspace" /><Stat symbol="✓" value={active} label="Active users" note={(people.length ? Math.round(active / people.length * 100) : 0) + "% of total"} tone="green" /><Stat symbol="⌂" value={departments} label="Departments" note="From role templates" /><Stat symbol="▱" value={templates.length} label="Role templates" note="Available work roles" tone="violet" /></div>
     <nav className="flex gap-7 border-b border-slate-200"><span className="border-b-2 border-blue-600 px-4 py-3 text-sm font-semibold text-blue-600">People</span><Link href="/admin/templates" className="px-4 py-3 text-sm font-medium text-slate-500">Role templates</Link><span className="px-4 py-3 text-sm font-medium text-slate-500">Organisation chart</span></nav>
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">

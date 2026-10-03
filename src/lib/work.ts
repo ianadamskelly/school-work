@@ -5,6 +5,7 @@ export type WorkStatus = "planned" | "in_progress" | "blocked" | "completed" | "
 
 export type WorkItem = {
   id: number;
+  monthly_objective_id: number | null;
   title: string;
   description: string;
   work_type: WorkType;
@@ -49,7 +50,7 @@ export function listWork(userId: number, view: string, today: string): WorkItem[
   }
   return db
     .prepare(
-      `SELECT wi.id, wi.title, wi.description, wi.work_type, wi.status, wi.due_date,
+      `SELECT wi.id, wi.monthly_objective_id, wi.title, wi.description, wi.work_type, wi.status, wi.due_date,
               COALESCE(mo.title, o.title) AS objective_title, COALESCE(mfa.title, fa.name) AS focus_area,
               (SELECT wu.text FROM work_updates wu WHERE wu.work_item_id = wi.id ORDER BY wu.update_date DESC, wu.id DESC LIMIT 1) AS latest_update,
               (SELECT COUNT(*) FROM blockers b WHERE b.work_item_id = wi.id AND b.resolved = 0) AS open_blockers

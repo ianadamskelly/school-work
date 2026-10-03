@@ -288,6 +288,9 @@ export async function addMonthlyWorkObjective(formData: FormData) {
       "INSERT INTO monthly_objectives (plan_id, title, intended_outcome, priority, sort) VALUES (?, ?, ?, ?, ?)"
     ).run(plan.id, title, outcome, str(formData, "priority") === "high" ? "high" : "normal", sort).lastInsertRowid);
     db.prepare("INSERT INTO monthly_objective_strategic_links (monthly_objective_id, strategic_objective_id) VALUES (?, ?)").run(objectiveId, strategicId);
+    // Keep the original reporting join in sync while the application migrates
+    // from strategic-plan selections to staff-owned monthly objectives.
+    db.prepare("INSERT OR IGNORE INTO monthly_plan_objectives (plan_id, objective_id) VALUES (?, ?)").run(plan.id, strategicId);
   });
   save();
   revalidatePath("/monthly");
@@ -366,6 +369,18 @@ export async function saveWeeklySummary(formData: FormData) {
   const progress = objectiveProgress.length
     ? Math.round(objectiveProgress.reduce((sum, row) => sum + row.progress_percent, 0) / objectiveProgress.length)
     : null;
+  const weekStart = `${year}-${String(month).padStart(2, "0")}-${String((week - 1) * 7 + 1).padStart(2, "0")}`;
+  const weekEnd = week === 4
+    ? `${year}-${String(month).padStart(2, "0")}-31`
+    : `${year}-${String(month).padStart(2, "0")}-${String(week * 7).padStart(2, "0")}`;
+  const uploadedEvidence = db.prepare(
+    `SELECT we.original_name
+       FROM work_evidence we
+       JOIN work_updates wu ON wu.id = we.work_update_id
+      WHERE wu.user_id = ? AND wu.update_date BETWEEN ? AND ?
+      ORDER BY we.id DESC`
+  ).all(user.id, weekStart, weekEnd) as { original_name: string }[];
+  const evidenceText = uploadedEvidence.map((item) => item.original_name).join("\n") || str(formData, "evidence");
 
   db.transaction(() => {
     db.prepare(
@@ -389,7 +404,7 @@ export async function saveWeeklySummary(formData: FormData) {
                        THEN 'seen' ELSE excluded.status END`
     ).run(
       user.id, year, month, week, focus1, focus2,
-      str(formData, "tasks_completed"), str(formData, "evidence"), str(formData, "challenges"),
+      str(formData, "tasks_completed"), evidenceText, str(formData, "challenges"),
       str(formData, "solutions"), str(formData, "people_engaged"), str(formData, "impact"),
       String(formData.get("risk_level") ?? "Low"), str(formData, "next_week_plan"), progress,
       submit ? "submitted" : "draft"
@@ -551,7 +566,13 @@ export async function createUser(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  if (!name || !email || password.length < 6) redirect("/admin?error=invalid");
+  const role = String(formData.get("role") ?? "employee");
+  const managerId = numOrNull(formData.get("manager_id"));
+  if (!name || !email || password.length < 6 || !["admin", "manager", "employee"].includes(role)) redirect("/admin?error=invalid");
+  if (managerId) {
+    const manager = getDb().prepare("SELECT role, active FROM users WHERE id = ?").get(managerId) as { role: string; active: number } | undefined;
+    if (!manager || !manager.active || (manager.role !== "manager" && manager.role !== "admin")) redirect("/admin?error=reporting");
+  }
   try {
     getDb()
       .prepare(
@@ -562,9 +583,9 @@ export async function createUser(formData: FormData) {
         name,
         email,
         bcrypt.hashSync(password, 10),
-        String(formData.get("role") ?? "employee"),
+        role,
         String(formData.get("job_title") ?? "").trim(),
-        numOrNull(formData.get("manager_id")),
+        managerId,
         numOrNull(formData.get("template_id"))
       );
   } catch {
@@ -578,12 +599,24 @@ export async function updateUser(formData: FormData) {
   await requireAdmin();
   const id = Number(formData.get("id"));
   const db = getDb();
+  const managerId = numOrNull(formData.get("manager_id"));
+  const role = String(formData.get("role") ?? "employee");
+  if (!id || !["admin", "manager", "employee"].includes(role) || managerId === id) redirect("/admin?error=reporting");
+  if (managerId) {
+    const manager = db.prepare("SELECT id, role, active FROM users WHERE id = ?").get(managerId) as { id: number; role: string; active: number } | undefined;
+    if (!manager || !manager.active || (manager.role !== "manager" && manager.role !== "admin")) redirect("/admin?error=reporting");
+    let cursor: number | null = managerId;
+    while (cursor) {
+      if (cursor === id) redirect("/admin?error=reporting");
+      cursor = (db.prepare("SELECT manager_id FROM users WHERE id = ?").get(cursor) as { manager_id: number | null } | undefined)?.manager_id ?? null;
+    }
+  }
   db.prepare(
     `UPDATE users SET role = ?, job_title = ?, manager_id = ?, template_id = ?, active = ? WHERE id = ?`
   ).run(
-    String(formData.get("role") ?? "employee"),
+    role,
     String(formData.get("job_title") ?? "").trim(),
-    numOrNull(formData.get("manager_id")),
+    managerId,
     numOrNull(formData.get("template_id")),
     formData.get("active") === "on" ? 1 : 0,
     id
@@ -607,6 +640,33 @@ export async function createTemplate(formData: FormData) {
     .run(name, String(formData.get("description") ?? "").trim());
   revalidatePath("/admin/templates");
   redirect(`/admin/templates/${result.lastInsertRowid}`);
+}
+
+export async function duplicateTemplate(formData: FormData) {
+  await requireAdmin();
+  const sourceId = Number(formData.get("template_id"));
+  const db = getDb();
+  const source = db.prepare("SELECT name, description FROM templates WHERE id = ?").get(sourceId) as { name: string; description: string } | undefined;
+  if (!source) redirect("/admin/templates");
+  let name = `${source.name} (copy)`;
+  let suffix = 2;
+  while (db.prepare("SELECT 1 FROM templates WHERE name = ?").get(name)) name = `${source.name} (copy ${suffix++})`;
+  const newId = db.transaction(() => {
+    const id = Number(db.prepare("INSERT INTO templates (name, description) VALUES (?, ?)").run(name, source.description).lastInsertRowid);
+    const focus = db.prepare("SELECT id, name, sort FROM focus_areas WHERE template_id = ? ORDER BY id").all(sourceId) as { id: number; name: string; sort: number }[];
+    const focusMap = new Map<number, number>();
+    for (const row of focus) focusMap.set(row.id, Number(db.prepare("INSERT INTO focus_areas (template_id, name, sort) VALUES (?, ?, ?)").run(id, row.name, row.sort).lastInsertRowid));
+    for (const table of ["task_categories", "tor_areas", "departments"] as const) {
+      const rows = db.prepare(`SELECT * FROM ${table} WHERE template_id = ? ORDER BY id`).all(sourceId) as Record<string, unknown>[];
+      for (const row of rows) {
+        if (table === "task_categories") db.prepare("INSERT INTO task_categories (template_id, focus_area_id, name, day_code, week_number, sort) VALUES (?, ?, ?, ?, ?, ?)").run(id, focusMap.get(Number(row.focus_area_id)) ?? null, row.name, row.day_code, row.week_number, row.sort);
+        else db.prepare(`INSERT INTO ${table} (template_id, name, sort) VALUES (?, ?, ?)`).run(id, row.name, row.sort);
+      }
+    }
+    return id;
+  })();
+  revalidatePath("/admin/templates");
+  redirect(`/admin/templates/${newId}`);
 }
 
 export async function addFocusArea(formData: FormData) {
