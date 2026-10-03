@@ -52,47 +52,93 @@ export async function addDailyLog(formData: FormData) {
   const activity = String(formData.get("activity") ?? "").trim();
   if (!activity) redirect("/daily?error=activity");
   const followupRequired = formData.get("followup_required") === "on" ? 1 : 0;
-  getDb()
-    .prepare(
-      `INSERT INTO daily_logs
-       (user_id, log_date, category_id, activity, department_id, hours, outcome,
-        followup_required, followup_date, priority, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .run(
+  const db = getDb();
+  const logDate = String(formData.get("log_date"));
+  const statusLabel = String(formData.get("status") ?? "Pending");
+  const workStatus = statusLabel === "Completed" ? "completed" : statusLabel === "In Progress" ? "in_progress" : "planned";
+  const requestedType = String(formData.get("work_type") ?? "planned");
+  const workType = requestedType === "recurring" || requestedType === "reactive" ? requestedType : "planned";
+  const focusId = numOrNull(formData.get("monthly_focus_area_id"));
+  const outcome = String(formData.get("outcome") ?? "").trim();
+  db.transaction(() => {
+    const logId = Number(db.prepare("INSERT INTO daily_logs (user_id, log_date, category_id, activity, department_id, hours, outcome, followup_required, followup_date, priority, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
       user.id,
-      String(formData.get("log_date")),
+      logDate,
       numOrNull(formData.get("category_id")),
       activity,
       numOrNull(formData.get("department_id")),
       Number(formData.get("hours") ?? 0) || 0,
-      String(formData.get("outcome") ?? "").trim(),
+      outcome,
       followupRequired,
       followupRequired ? String(formData.get("followup_date") ?? "") || null : null,
       String(formData.get("priority") ?? "Medium"),
-      String(formData.get("status") ?? "Pending")
-    );
+      statusLabel
+    ).lastInsertRowid);
+    let monthlyPlanId: number | null = null;
+    let monthlyObjectiveId: number | null = null;
+    let strategicObjectiveId: number | null = null;
+    if (focusId) {
+      const focus = db.prepare("SELECT mfa.monthly_objective_id, mp.id AS monthly_plan_id, (SELECT strategic_objective_id FROM monthly_objective_strategic_links WHERE monthly_objective_id = mo.id LIMIT 1) AS strategic_objective_id FROM monthly_focus_areas mfa JOIN monthly_objectives mo ON mo.id = mfa.monthly_objective_id JOIN monthly_plans mp ON mp.id = mo.plan_id WHERE mfa.id = ? AND mp.user_id = ? AND mp.status = 'approved'").get(focusId, user.id) as { monthly_objective_id: number; monthly_plan_id: number; strategic_objective_id: number | null } | undefined;
+      if (!focus) redirect("/daily?error=objective");
+      monthlyPlanId = focus.monthly_plan_id;
+      monthlyObjectiveId = focus.monthly_objective_id;
+      strategicObjectiveId = focus.strategic_objective_id;
+    }
+    const itemId = Number(db.prepare("INSERT INTO work_items (user_id, monthly_plan_id, monthly_objective_id, monthly_focus_area_id, objective_id, work_type, title, description, status, due_date, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'completed' THEN datetime('now') ELSE NULL END)").run(user.id, monthlyPlanId, monthlyObjectiveId, focusId, strategicObjectiveId, workType, activity, outcome, workStatus, logDate, workStatus).lastInsertRowid);
+    db.prepare("INSERT INTO work_updates (user_id, work_item_id, update_date, text, status_after, legacy_daily_log_id) VALUES (?, ?, ?, ?, ?, ?)").run(user.id, itemId, logDate, outcome ? activity + ": " + outcome : activity, workStatus, logId);
+  })();
   revalidatePath("/daily");
+  revalidatePath("/daily/updates");
   revalidatePath("/");
+  revalidatePath("/work");
+  revalidatePath("/weekly");
+  revalidatePath("/monthly");
   redirect("/daily?saved=1");
 }
 
 export async function setDailyStatus(formData: FormData) {
   const user = await requireUser();
-  getDb()
-    .prepare("UPDATE daily_logs SET status = ? WHERE id = ? AND user_id = ?")
-    .run(String(formData.get("status")), Number(formData.get("id")), user.id);
+  const db = getDb();
+  const logId = Number(formData.get("id"));
+  const statusLabel = String(formData.get("status"));
+  const workStatus = statusLabel === "Completed" ? "completed" : statusLabel === "In Progress" ? "in_progress" : "planned";
+  db.transaction(() => {
+    db.prepare("UPDATE daily_logs SET status = ? WHERE id = ? AND user_id = ?").run(statusLabel, logId, user.id);
+    const update = db.prepare("SELECT work_item_id FROM work_updates WHERE legacy_daily_log_id = ? AND user_id = ?").get(logId, user.id) as { work_item_id: number | null } | undefined;
+    if (update?.work_item_id) {
+      db.prepare("UPDATE work_updates SET status_after = ?, updated_at = datetime('now') WHERE legacy_daily_log_id = ?").run(workStatus, logId);
+      db.prepare("UPDATE work_items SET status = ?, completed_at = CASE WHEN ? = 'completed' THEN datetime('now') ELSE completed_at END, updated_at = datetime('now') WHERE id = ? AND user_id = ?").run(workStatus, workStatus, update.work_item_id, user.id);
+    }
+  })();
   revalidatePath("/daily");
+  revalidatePath("/daily/updates");
   revalidatePath("/");
+  revalidatePath("/work");
+  revalidatePath("/weekly");
+  revalidatePath("/monthly");
 }
 
 export async function deleteDailyLog(formData: FormData) {
   const user = await requireUser();
-  getDb()
-    .prepare("DELETE FROM daily_logs WHERE id = ? AND user_id = ?")
-    .run(Number(formData.get("id")), user.id);
+  const db = getDb();
+  const logId = Number(formData.get("id"));
+  db.transaction(() => {
+    const update = db.prepare("SELECT id, work_item_id FROM work_updates WHERE legacy_daily_log_id = ? AND user_id = ?").get(logId, user.id) as { id: number; work_item_id: number | null } | undefined;
+    db.prepare("DELETE FROM daily_logs WHERE id = ? AND user_id = ?").run(logId, user.id);
+    if (update) {
+      db.prepare("DELETE FROM work_updates WHERE id = ?").run(update.id);
+      if (update.work_item_id) {
+        const remaining = db.prepare("SELECT COUNT(*) AS n FROM work_updates WHERE work_item_id = ?").get(update.work_item_id) as { n: number };
+        if (remaining.n === 0) db.prepare("DELETE FROM work_items WHERE id = ? AND user_id = ?").run(update.work_item_id, user.id);
+      }
+    }
+  })();
   revalidatePath("/daily");
+  revalidatePath("/daily/updates");
   revalidatePath("/");
+  revalidatePath("/work");
+  revalidatePath("/weekly");
+  revalidatePath("/monthly");
 }
 
 // ---------- objectives (owned by line managers) ----------
