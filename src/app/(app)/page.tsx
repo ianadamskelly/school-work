@@ -1,3 +1,4 @@
+import { Icon as Glyph } from "@/components/icon";
 import Link from "next/link";
 import { EvidenceInput } from "@/components/evidence-input";
 import { objectiveProgress } from "@/lib/planning";
@@ -11,20 +12,7 @@ import { getMonthlyPlan, getPlanObjectives } from "@/lib/plan";
 import { getMonthlyWorkObjectives } from "@/lib/planning";
 import { SavedNotice, inputCls, btnPrimary, btnSecondary } from "@/components/ui";
 
-function Glyph({ name, className = "" }: { name: "check" | "clock" | "alert" | "file" | "people" | "sun" | "paperclip" | "plus" | "arrow"; className?: string }) {
-  const paths = {
-    check: <><circle cx="12" cy="12" r="9" /><path d="m8 12 2.5 2.5L16 9" /></>,
-    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
-    alert: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5M12 16h.01" /></>,
-    file: <><path d="M7 3h7l3 3v15H7z" /><path d="M14 3v4h4M10 12h4M10 16h4" /></>,
-    people: <><circle cx="9" cy="9" r="3" /><circle cx="16" cy="10" r="2.5" /><path d="M3.5 20c.5-3.3 2.4-5 5.5-5s5 1.7 5.5 5M14 15c3 0 5 1.7 5.5 5" /></>,
-    sun: <><circle cx="12" cy="12" r="3.5" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" /></>,
-    paperclip: <path d="m8 12 5.6-5.6a3 3 0 1 1 4.2 4.2l-7.1 7.1a4.5 4.5 0 1 1-6.4-6.4l6.7-6.7" />,
-    plus: <path d="M12 5v14M5 12h14" />,
-    arrow: <path d="M5 12h14m-5-5 5 5-5 5" />,
-  };
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className={className}>{paths[name]}</svg>;
-}
+
 
 function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <section className={`overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_2px_5px_rgba(15,23,42,0.025)] ${className}`}>{children}</section>;

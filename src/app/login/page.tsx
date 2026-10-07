@@ -1,3 +1,4 @@
+import { Icon } from "@/components/icon";
 import { PasswordInput } from "@/components/password-input";
 import { redirect } from "next/navigation";
 import { login } from "@/lib/actions";
@@ -7,7 +8,7 @@ import { inputCls, btnPrimary } from "@/components/ui";
 function Mark({ small = false }: { small?: boolean }) {
   return <span className={`relative flex items-center justify-center rounded-xl bg-blue-600 font-bold text-white shadow-sm before:absolute before:left-0 before:top-0 before:rounded-tl-xl before:bg-cyan-300 ${small ? "h-8 w-8 text-sm before:h-3.5 before:w-3.5" : "h-11 w-11 text-xl before:h-5 before:w-5"}`}>P</span>;
 }
-function Icon({ name, className = "" }: { name: "mail" | "lock" | "eye" | "sun"; className?: string }) { const shapes = { mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></>, lock: <><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 15v2" /></>, eye: <><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12" /><circle cx="12" cy="12" r="2.5" /></>, sun: <><circle cx="12" cy="12" r="3.5" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" /></> }; return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className={className}>{shapes[name]}</svg>; }
+
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const user = await getSessionUser(); if (user) redirect("/"); const params = await searchParams;

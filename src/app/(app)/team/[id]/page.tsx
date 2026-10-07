@@ -1,3 +1,4 @@
+import { Icon } from "@/components/icon";
 import Link from "next/link";
 import { dailyUpdates } from "@/lib/work";
 import { notFound, redirect } from "next/navigation";
@@ -98,7 +99,7 @@ export default async function PersonPage({
  return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-4"><span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100 text-2xl font-bold text-blue-700">{person.name.charAt(0)}</span><div><Link href="/team" className="text-sm font-medium text-blue-600 hover:text-blue-700">← Back to team</Link><h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">{person.name}</h1><p className="mt-1 text-base text-slate-500">{person.job_title || "Team member"} · monthly planning, weekly reporting and review</p></div></div>
+        <div className="flex items-center gap-4"><span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100 text-2xl font-bold text-blue-700 shrink-0">{person.name.charAt(0)}</span><div><Link href="/team" className="text-sm font-medium text-blue-600 hover:text-blue-700"><Icon name="left" className="h-4 w-4" /> Back to team</Link><h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">{person.name}</h1><p className="mt-1 text-base text-slate-500">{person.job_title || "Team member"} · monthly planning, weekly reporting and review</p></div></div>
         <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-right"><p className="text-sm font-semibold text-emerald-800">{currentPlan?.status === "approved" ? "Plan approved" : currentPlan?.submitted_at ? "Plan awaiting review" : "Planning in progress"}</p><p className="mt-1 text-xs text-emerald-700">{MONTH_NAMES[month - 1]} {year}</p></div>
       </div>
       <form className="flex flex-wrap items-end gap-2"><label className="text-xs text-slate-500">Reporting year<input name="year" type="number" min="1970" max="9999" defaultValue={year} className="block w-24 rounded-lg border border-slate-200 p-2" /></label><label className="text-xs text-slate-500">Month<select name="month" defaultValue={month} className="block rounded-lg border border-slate-200 p-2">{MONTH_NAMES.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}</select></label><button className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white">View month</button></form>

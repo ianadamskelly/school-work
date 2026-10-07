@@ -1,3 +1,4 @@
+import { Icon } from "@/components/icon";
 import Link from "next/link";
 import { updateTemplate } from "@/lib/actions";
 import { notFound, redirect } from "next/navigation";
@@ -34,7 +35,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
 
   return <div className="space-y-5">
     <div className="flex flex-wrap items-start justify-between gap-4">
-      <div><Link href="/admin/templates" className="text-sm font-medium text-blue-600 hover:text-blue-700">← Back to role templates</Link><h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">{template.name}</h1><p className="mt-2 max-w-3xl text-base text-slate-500">{template.description || "Define the work that connects this role’s daily activity to focused objectives and reviews."}</p></div>
+      <div><Link href="/admin/templates" className="text-sm font-medium text-blue-600 hover:text-blue-700"><Icon name="left" className="h-4 w-4" /> Back to role templates</Link><h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">{template.name}</h1><p className="mt-2 max-w-3xl text-base text-slate-500">{template.description || "Define the work that connects this role’s daily activity to focused objectives and reviews."}</p></div>
       <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-right"><p className="text-2xl font-bold text-slate-950">{categories.length}</p><p className="text-xs font-medium text-blue-700">default responsibilities</p></div>
     </div>
     <details className="rounded-xl border border-slate-200 bg-white p-5"><summary className="cursor-pointer font-semibold text-blue-600">Edit template name and description</summary><form action={updateTemplate} className="mt-4 space-y-3"><input type="hidden" name="template_id" value={template.id} /><label className="block text-sm">Name<input name="name" required defaultValue={template.name} className={inputCls} /></label><label className="block text-sm">Description<textarea name="description" defaultValue={template.description} className={inputCls} /></label><button className={btnPrimary}>Save template</button></form></details>

@@ -1,3 +1,4 @@
+import { Icon } from "@/components/icon";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
@@ -8,8 +9,7 @@ import { Field, SavedNotice, inputCls, btnPrimary, btnSecondary } from "@/compon
 
 type Summary = { tasks_completed: string; challenges: string; next_week_plan: string; status: string; manager_comment: string };
 type PlanObjective = { id: number; title: string; description: string };
-type IconName = "sparkle" | "target" | "check" | "clock" | "alert" | "clip" | "file" | "calendar" | "person" | "arrow" | "send" | "save";
-function Icon({ name, className = "" }: { name: IconName; className?: string }) { const paths: Record<IconName, React.ReactNode> = { sparkle: <><path d="m12 2 1.3 6.7L20 10l-6.7 1.3L12 18l-1.3-6.7L4 10l6.7-1.3z" /><path d="m19 16 .6 2.4L22 19l-2.4.6L19 22l-.6-2.4L16 19l2.4-.6z" /></>, target: <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><path d="m12 12 7-7" /></>, check: <><circle cx="12" cy="12" r="9" /><path d="m8 12 2.5 2.5L16 9" /></>, clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>, alert: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5M12 16h.01" /></>, clip: <path d="m8 12 5.6-5.6a3 3 0 1 1 4.2 4.2l-7.1 7.1a4.5 4.5 0 1 1-6.4-6.4l6.7-6.7" />, file: <><path d="M7 3h7l3 3v15H7z" /><path d="M14 3v4h4M10 12h4M10 16h4" /></>, calendar: <><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16" /></>, person: <><circle cx="12" cy="8" r="3" /><path d="M5 21c.7-4 3-6 7-6s6.3 2 7 6" /></>, arrow: <path d="M5 12h14m-5-5 5 5-5 5" />, send: <path d="m3 11 18-8-6 18-4-7zM11 14l4-4" />, save: <><path d="M5 3h12l2 2v16H5z" /><path d="M8 3v6h8V3M8 20v-6h8v6" /></> }; return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className={className}>{paths[name]}</svg>; }
+
 function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) { return <section className={`rounded-xl border border-slate-200 bg-white shadow-[0_2px_5px_rgba(15,23,42,0.025)] ${className}`}>{children}</section>; }
 
 export default async function WeeklyPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string; year?: string; month?: string; week?: string }> }) {
