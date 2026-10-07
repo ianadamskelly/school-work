@@ -1,0 +1,2573 @@
+{
+  "date": "2026-10-06",
+  "commit": "a85978a",
+  "environment": "Isolated local Chromium; development viewport checks and production smoke checks",
+  "calibration": "Selector/time-wait errors excluded or replaced by verified reruns. Multiple assertions may reproduce one defect.",
+  "validation": {
+    "lint": "PASS",
+    "typescript": "PASS",
+    "productionBuild": "PASS"
+  },
+  "summary": {
+    "assertions": 162,
+    "pass": 116,
+    "fail": 44,
+    "observation": 2
+  },
+  "assertions": [
+    {
+      "name": "Admin login",
+      "status": "PASS"
+    },
+    {
+      "name": "Create line manager",
+      "status": "PASS",
+      "detail": {
+        "id": 4
+      }
+    },
+    {
+      "name": "Create employee and assign manager/template",
+      "status": "PASS",
+      "detail": {
+        "id": 5,
+        "template": 1
+      }
+    },
+    {
+      "name": "Reject duplicate employee email",
+      "status": "PASS",
+      "detail": "Duplicate rejected"
+    },
+    {
+      "name": "Manager and staff login",
+      "status": "PASS"
+    },
+    {
+      "name": "Manager creates strategic priority",
+      "status": "PASS"
+    },
+    {
+      "name": "Employee cannot access admin/team",
+      "status": "PASS"
+    },
+    {
+      "name": "Manager cannot access admin",
+      "status": "PASS"
+    },
+    {
+      "name": "Create two complementary monthly objectives",
+      "status": "PASS",
+      "detail": [
+        {
+          "title": "Audit 40 classroom devices"
+        },
+        {
+          "title": "Train 12 teachers on ManageBac"
+        }
+      ]
+    },
+    {
+      "name": "Add objective focus areas and submit plan",
+      "status": "PASS"
+    },
+    {
+      "name": "Manager views objectives and requests revision",
+      "status": "PASS"
+    },
+    {
+      "name": "Staff sees feedback, adjusts and resubmits",
+      "status": "PASS"
+    },
+    {
+      "name": "Manager approves resubmitted plan",
+      "status": "PASS"
+    },
+    {
+      "name": "Create planned, recurring and reactive daily activities with evidence",
+      "status": "PASS",
+      "detail": [
+        {
+          "activity": "Audited 10 devices in C1 and C2",
+          "status": "Completed"
+        },
+        {
+          "activity": "Delivered ManageBac workshop for six teachers",
+          "status": "In Progress"
+        },
+        {
+          "activity": "Restored staff-room printer connectivity",
+          "status": "Pending"
+        }
+      ]
+    },
+    {
+      "name": "Daily activities/evidence appear in weekly report",
+      "status": "PASS",
+      "detail": {
+        "taskCount": 3
+      }
+    },
+    {
+      "name": "Save weekly progress and reload it",
+      "status": "FAIL",
+      "detail": "Saved 25% reloads as \"\""
+    },
+    {
+      "name": "Submit weekly report and manager requests changes",
+      "status": "PASS"
+    },
+    {
+      "name": "Staff revises report and manager approves",
+      "status": "PASS"
+    },
+    {
+      "name": "Create objective-linked work from Work screen",
+      "status": "FAIL",
+      "detail": "Linked work not saved"
+    },
+    {
+      "name": "Work update stays synchronized with Daily Updates",
+      "status": "FAIL",
+      "detail": "Daily remains In Progress after Work completion"
+    },
+    {
+      "name": "Monthly review submit/review feedback loop",
+      "status": "PASS"
+    },
+    {
+      "name": "Admin resets employee password; old rejected/new accepted",
+      "status": "PASS"
+    },
+    {
+      "name": "Password reset revokes existing employee session",
+      "status": "FAIL",
+      "detail": "Existing session remains authenticated after reset"
+    },
+    {
+      "name": "Evidence role authorization and binary download",
+      "status": "PASS"
+    },
+    {
+      "name": "Admin deactivation blocks existing session and reactivation restores login",
+      "status": "PASS"
+    },
+    {
+      "name": "Role-template duplication",
+      "status": "PASS"
+    },
+    {
+      "name": "Responsive admin 1448 /",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Good morning, System",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 1448 /work",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Work",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 1448 /admin",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "People & Roles",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 1448 /admin/templates",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Role Templates",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 1448 /admin/templates/1",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Principal",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 1448 /team",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Team Overview",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 1448 /team/objectives",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Strategic Objectives",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 768 /",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Good morning, System",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 768 /work",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Work",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 768 /admin",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "People & Roles",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 768 /admin/templates",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Role Templates",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 768 /admin/templates/1",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Principal",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 768 /team",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Team Overview",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 768 /team/objectives",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Strategic Objectives",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 390 /",
+      "status": "PASS",
+      "detail": {
+        "width": 390,
+        "scroll": 390,
+        "title": "Good morning, System",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 390 /work",
+      "status": "PASS",
+      "detail": {
+        "width": 390,
+        "scroll": 390,
+        "title": "Work",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 390 /admin",
+      "status": "PASS",
+      "detail": {
+        "width": 390,
+        "scroll": 390,
+        "title": "People & Roles",
+        "offscreen": [
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "text": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "text": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "password",
+            "text": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "job_title",
+            "text": ""
+          },
+          {
+            "tag": "SELECT",
+            "name": "role",
+            "text": ""
+          },
+          {
+            "tag": "SELECT",
+            "name": "manager_id",
+            "text": ""
+          },
+          {
+            "tag": "SELECT",
+            "name": "template_id",
+            "text": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "",
+            "text": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "Responsive admin 390 /admin/templates",
+      "status": "PASS",
+      "detail": {
+        "width": 390,
+        "scroll": 390,
+        "title": "Role Templates",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 390 /admin/templates/1",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 403/390"
+    },
+    {
+      "name": "Responsive admin 390 /team",
+      "status": "PASS",
+      "detail": {
+        "width": 390,
+        "scroll": 390,
+        "title": "Team Overview",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 390 /team/objectives",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 586/390"
+    },
+    {
+      "name": "Responsive admin 320 /",
+      "status": "PASS",
+      "detail": {
+        "width": 320,
+        "scroll": 320,
+        "title": "Good morning, System",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 320 /work",
+      "status": "PASS",
+      "detail": {
+        "width": 320,
+        "scroll": 320,
+        "title": "Work",
+        "offscreen": [
+          {
+            "tag": "INPUT",
+            "name": "title",
+            "text": ""
+          },
+          {
+            "tag": "SELECT",
+            "name": "status",
+            "text": ""
+          },
+          {
+            "tag": "SELECT",
+            "name": "monthly_focus_area_id",
+            "text": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "",
+            "text": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "title",
+            "text": ""
+          },
+          {
+            "tag": "SELECT",
+            "name": "status",
+            "text": ""
+          },
+          {
+            "tag": "SELECT",
+            "name": "monthly_focus_area_id",
+            "text": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "",
+            "text": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "Responsive admin 320 /admin",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 364/320"
+    },
+    {
+      "name": "Responsive admin 320 /admin/templates",
+      "status": "PASS",
+      "detail": {
+        "width": 320,
+        "scroll": 320,
+        "title": "Role Templates",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 320 /admin/templates/1",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 403/320"
+    },
+    {
+      "name": "Responsive admin 320 /team",
+      "status": "PASS",
+      "detail": {
+        "width": 320,
+        "scroll": 320,
+        "title": "Team Overview",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive admin 320 /team/objectives",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 586/320"
+    },
+    {
+      "name": "Responsive manager 1448 /",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Good morning, Amina",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 1448 /work",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Work",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 1448 /team",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Team Overview",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 1448 /team/5",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Hassan Ali QA",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 1448 /team/objectives",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Strategic Objectives",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 1448 /team/reports/1",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Weekly Report Review",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 768 /",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Good morning, Amina",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 768 /work",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Work",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 768 /team",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Team Overview",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 768 /team/5",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Hassan Ali QA",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 768 /team/objectives",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Strategic Objectives",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 768 /team/reports/1",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Weekly Report Review",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 390 /",
+      "status": "PASS",
+      "detail": {
+        "width": 390,
+        "scroll": 390,
+        "title": "Good morning, Amina",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 390 /work",
+      "status": "PASS",
+      "detail": {
+        "width": 390,
+        "scroll": 390,
+        "title": "Work",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 390 /team",
+      "status": "PASS",
+      "detail": {
+        "width": 390,
+        "scroll": 390,
+        "title": "Team Overview",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 390 /team/5",
+      "status": "PASS",
+      "detail": {
+        "width": 390,
+        "scroll": 390,
+        "title": "Hassan Ali QA",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 390 /team/objectives",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 579/390"
+    },
+    {
+      "name": "Responsive manager 390 /team/reports/1",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 550/390"
+    },
+    {
+      "name": "Responsive manager 320 /",
+      "status": "PASS",
+      "detail": {
+        "width": 320,
+        "scroll": 320,
+        "title": "Good morning, Amina",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 320 /work",
+      "status": "PASS",
+      "detail": {
+        "width": 320,
+        "scroll": 320,
+        "title": "Work",
+        "offscreen": [
+          {
+            "tag": "INPUT",
+            "name": "title",
+            "text": ""
+          },
+          {
+            "tag": "SELECT",
+            "name": "status",
+            "text": ""
+          },
+          {
+            "tag": "SELECT",
+            "name": "monthly_focus_area_id",
+            "text": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "",
+            "text": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "title",
+            "text": ""
+          },
+          {
+            "tag": "SELECT",
+            "name": "status",
+            "text": ""
+          },
+          {
+            "tag": "SELECT",
+            "name": "monthly_focus_area_id",
+            "text": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "",
+            "text": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "Responsive manager 320 /team",
+      "status": "PASS",
+      "detail": {
+        "width": 320,
+        "scroll": 320,
+        "title": "Team Overview",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 320 /team/5",
+      "status": "PASS",
+      "detail": {
+        "width": 320,
+        "scroll": 320,
+        "title": "Hassan Ali QA",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive manager 320 /team/objectives",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 579/320"
+    },
+    {
+      "name": "Responsive manager 320 /team/reports/1",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 550/320"
+    },
+    {
+      "name": "Responsive staff 1448 /",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 1519/1448"
+    },
+    {
+      "name": "Responsive staff 1448 /daily",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Daily Update",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive staff 1448 /daily/updates",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Daily Updates — October 2026",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive staff 1448 /work",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Work",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive staff 1448 /monthly",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Objectives",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive staff 1448 /weekly",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 1825/1448"
+    },
+    {
+      "name": "Responsive staff 1448 /reviews",
+      "status": "PASS",
+      "detail": {
+        "width": 1448,
+        "scroll": 1448,
+        "title": "Monthly Review",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive staff 768 /",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 774/768"
+    },
+    {
+      "name": "Responsive staff 768 /daily",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Daily Update",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive staff 768 /daily/updates",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Daily Updates — October 2026",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive staff 768 /work",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Work",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive staff 768 /monthly",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Objectives",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive staff 768 /weekly",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 1335/768"
+    },
+    {
+      "name": "Responsive staff 768 /reviews",
+      "status": "PASS",
+      "detail": {
+        "width": 768,
+        "scroll": 768,
+        "title": "Monthly Review",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive staff 390 /",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 762/390"
+    },
+    {
+      "name": "Responsive staff 390 /daily",
+      "status": "PASS",
+      "detail": {
+        "width": 390,
+        "scroll": 390,
+        "title": "Daily Update",
+        "offscreen": [
+          {
+            "tag": "SELECT",
+            "name": "monthly_focus_area_id",
+            "text": "Operational or unplanned work\n"
+          },
+          {
+            "tag": "SELECT",
+            "name": "category_id",
+            "text": "Role category (optional)\nStrat"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Responsive staff 390 /daily/updates",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 479/390"
+    },
+    {
+      "name": "Responsive staff 390 /work",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 438/390"
+    },
+    {
+      "name": "Responsive staff 390 /monthly",
+      "status": "PASS",
+      "detail": {
+        "width": 390,
+        "scroll": 390,
+        "title": "Objectives",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive staff 390 /weekly",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 1323/390"
+    },
+    {
+      "name": "Responsive staff 390 /reviews",
+      "status": "PASS",
+      "detail": {
+        "width": 390,
+        "scroll": 390,
+        "title": "Monthly Review",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive staff 320 /",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 762/320"
+    },
+    {
+      "name": "Responsive staff 320 /daily",
+      "status": "PASS",
+      "detail": {
+        "width": 320,
+        "scroll": 320,
+        "title": "Daily Update",
+        "offscreen": [
+          {
+            "tag": "SELECT",
+            "name": "monthly_focus_area_id",
+            "text": "Operational or unplanned work\n"
+          },
+          {
+            "tag": "SELECT",
+            "name": "category_id",
+            "text": "Role category (optional)\nStrat"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Responsive staff 320 /daily/updates",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 479/320"
+    },
+    {
+      "name": "Responsive staff 320 /work",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 438/320"
+    },
+    {
+      "name": "Responsive staff 320 /monthly",
+      "status": "PASS",
+      "detail": {
+        "width": 320,
+        "scroll": 320,
+        "title": "Objectives",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Responsive staff 320 /weekly",
+      "status": "FAIL",
+      "detail": "Page horizontal overflow 1323/320"
+    },
+    {
+      "name": "Responsive staff 320 /reviews",
+      "status": "PASS",
+      "detail": {
+        "width": 320,
+        "scroll": 320,
+        "title": "Monthly Review",
+        "offscreen": []
+      }
+    },
+    {
+      "name": "Monthly objective progress reflects target rather than only logged task",
+      "status": "FAIL",
+      "detail": "Audit shows 100% although only 10/40 devices audited and remaining focus untouched"
+    },
+    {
+      "name": "Manager feedback visible on dedicated Monthly Review page",
+      "status": "FAIL",
+      "detail": "Reviewed status present but manager comments absent on /reviews"
+    },
+    {
+      "name": "Weekly report remains locked server-side after approval",
+      "status": "FAIL",
+      "detail": "Approved report overwritten and status changed to submitted"
+    },
+    {
+      "name": "Unsupported evidence upload produces clear validation error",
+      "status": "FAIL",
+      "detail": "Reports success while silently discarding unsupported attachment"
+    },
+    {
+      "name": "Advertised up-to-10MB evidence accepts a 2MB file",
+      "status": "FAIL",
+      "detail": "2MB upload rejected: This page couldn’t load\n\nA server error occurred. Reload to try again.\n\nReload\n\nERROR 1872570217@E394"
+    },
+    {
+      "name": "Create operational recurring work item",
+      "status": "PASS"
+    },
+    {
+      "name": "Recurring work supports an actual recurrence schedule",
+      "status": "FAIL",
+      "detail": "Only work_type is stored; no frequency/schedule control"
+    },
+    {
+      "name": "Work filters apply when selected",
+      "status": "FAIL",
+      "detail": "Selection does not apply and there is no visible Apply button"
+    },
+    {
+      "name": "Daily history change status syncs work",
+      "status": "PASS"
+    },
+    {
+      "name": "Daily deletion removes evidence file as well as metadata",
+      "status": "FAIL",
+      "detail": "Deleted evidence still occupies persistent volume"
+    },
+    {
+      "name": "Mobile sign-out available",
+      "status": "FAIL",
+      "detail": "Sign out exists only in hidden desktop sidebar"
+    },
+    {
+      "name": "Mobile add-work form fits viewport",
+      "status": "PASS"
+    },
+    {
+      "name": "Mobile invite-user form fits viewport",
+      "status": "FAIL",
+      "detail": "Invite popover out of bounds {\"x\":-188.9375,\"y\":450,\"width\":342,\"height\":428}"
+    },
+    {
+      "name": "Weekly calendar range handles February",
+      "status": "FAIL",
+      "detail": "Week 4 shows 22–31 February instead of ending on 28"
+    },
+    {
+      "name": "Reviewed weekly report has stable activity after later work changes",
+      "status": "FAIL",
+      "detail": "Approved report activity changes when daily task status changes"
+    },
+    {
+      "name": "Logout clears authenticated session",
+      "status": "PASS"
+    },
+    {
+      "name": "Login responsiveness 1448",
+      "status": "PASS"
+    },
+    {
+      "name": "Login responsiveness 768",
+      "status": "PASS"
+    },
+    {
+      "name": "Login responsiveness 390",
+      "status": "PASS"
+    },
+    {
+      "name": "Login responsiveness 320",
+      "status": "PASS"
+    },
+    {
+      "name": "Last administrator cannot deactivate own account",
+      "status": "FAIL",
+      "detail": "UI allows zero active administrators: workspace locked out"
+    },
+    {
+      "name": "Custom role template creation persisted",
+      "status": "PASS",
+      "detail": {
+        "id": 3
+      }
+    },
+    {
+      "name": "Template focus/category/review area/department create and remove",
+      "status": "PASS"
+    },
+    {
+      "name": "Duplicate custom template remaps linked focus",
+      "status": "PASS"
+    },
+    {
+      "name": "Reassign staff role template and category options refresh",
+      "status": "PASS"
+    },
+    {
+      "name": "Prevent circular reporting assignment",
+      "status": "PASS"
+    },
+    {
+      "name": "Manager with direct reports cannot be demoted without reassignment",
+      "status": "FAIL",
+      "detail": "Demotion accepted while employee 5 still reports to 4"
+    },
+    {
+      "name": "Employee without role template still visible to line manager",
+      "status": "PASS"
+    },
+    {
+      "name": "Search admin people by name",
+      "status": "PASS"
+    },
+    {
+      "name": "Strategic priority retire/reactivate",
+      "status": "PASS"
+    },
+    {
+      "name": "Sidebar exposes strategic objective management route",
+      "status": "OBSERVATION",
+      "detail": "Strategic management reachable through Team View all, not directly from sidebar."
+    },
+    {
+      "name": "Review-page submit roundtrip without approved plan",
+      "status": "OBSERVATION",
+      "detail": "Policy decision: future-month operational review accepted without approved plan"
+    },
+    {
+      "name": "Production admin /",
+      "status": "PASS"
+    },
+    {
+      "name": "Production admin /admin",
+      "status": "PASS"
+    },
+    {
+      "name": "Production admin /admin/templates",
+      "status": "PASS"
+    },
+    {
+      "name": "Production admin /admin/templates/3",
+      "status": "PASS"
+    },
+    {
+      "name": "Production admin /team",
+      "status": "PASS"
+    },
+    {
+      "name": "Production manager /team",
+      "status": "PASS"
+    },
+    {
+      "name": "Production manager /team/5",
+      "status": "PASS"
+    },
+    {
+      "name": "Production manager /team/objectives",
+      "status": "PASS"
+    },
+    {
+      "name": "Production manager /team/reports/1",
+      "status": "PASS"
+    },
+    {
+      "name": "Production staff /",
+      "status": "PASS"
+    },
+    {
+      "name": "Production staff /daily",
+      "status": "PASS"
+    },
+    {
+      "name": "Production staff /daily/updates",
+      "status": "PASS"
+    },
+    {
+      "name": "Production staff /work",
+      "status": "PASS"
+    },
+    {
+      "name": "Production staff /monthly",
+      "status": "PASS"
+    },
+    {
+      "name": "Production staff /weekly",
+      "status": "PASS"
+    },
+    {
+      "name": "Production staff /reviews",
+      "status": "PASS"
+    },
+    {
+      "name": "Production manager denied unrelated staff profile",
+      "status": "PASS"
+    },
+    {
+      "name": "Production unrelated manager denied staff report",
+      "status": "PASS"
+    },
+    {
+      "name": "Home Quick Update saves to work and weekly",
+      "status": "PASS"
+    },
+    {
+      "name": "Home Quick Update appears in Daily Updates timeline",
+      "status": "FAIL",
+      "detail": "Home update absent from Daily Updates despite present in weekly"
+    },
+    {
+      "name": "Work-only update appears in manager Daily Activity section",
+      "status": "FAIL",
+      "detail": "Manager daily activity reads daily_logs and omits Home/Work-only updates"
+    },
+    {
+      "name": "Weekly progress survives a second draft save",
+      "status": "FAIL",
+      "detail": "Second save deletes saved objective progress"
+    },
+    {
+      "name": "Submitted empty reflection report manager receives generated achievements",
+      "status": "FAIL",
+      "detail": "Generated tasks absent when optional reflection left blank"
+    },
+    {
+      "name": "Migration preserves staff-owned monthly objectives",
+      "status": "FAIL",
+      "detail": {
+        "before": [
+          {
+            "title": "Audit 40 devices QA"
+          },
+          {
+            "title": "Train 12 teachers QA"
+          }
+        ],
+        "after": [
+          {
+            "title": "Audit 40 devices QA"
+          },
+          {
+            "title": "Train 12 teachers QA"
+          },
+          {
+            "title": "Achieve full IB compliance ahead of the five-year evaluation"
+          }
+        ]
+      }
+    }
+  ],
+  "viewportMeasurements": [
+    {
+      "role": "admin",
+      "route": "/",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Good morning, System",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/work",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Work",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/admin",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "People & Roles",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/admin/templates",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Role Templates",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/admin/templates/1",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Principal",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/team",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Team Overview",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/team/objectives",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Strategic Objectives",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/",
+      "width": 768,
+      "scroll": 768,
+      "title": "Good morning, System",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/work",
+      "width": 768,
+      "scroll": 768,
+      "title": "Work",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/admin",
+      "width": 768,
+      "scroll": 768,
+      "title": "People & Roles",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/admin/templates",
+      "width": 768,
+      "scroll": 768,
+      "title": "Role Templates",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/admin/templates/1",
+      "width": 768,
+      "scroll": 768,
+      "title": "Principal",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/team",
+      "width": 768,
+      "scroll": 768,
+      "title": "Team Overview",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/team/objectives",
+      "width": 768,
+      "scroll": 768,
+      "title": "Strategic Objectives",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/",
+      "width": 390,
+      "scroll": 390,
+      "title": "Good morning, System",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/work",
+      "width": 390,
+      "scroll": 390,
+      "title": "Work",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/admin",
+      "width": 390,
+      "scroll": 390,
+      "title": "People & Roles",
+      "offscreen": [
+        {
+          "tag": "INPUT",
+          "name": "name",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "email",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "password",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "job_title",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "role",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "manager_id",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "template_id",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "route": "/admin/templates",
+      "width": 390,
+      "scroll": 390,
+      "title": "Role Templates",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/admin/templates/1",
+      "width": 390,
+      "scroll": 403,
+      "title": "Principal",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/team",
+      "width": 390,
+      "scroll": 390,
+      "title": "Team Overview",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/team/objectives",
+      "width": 390,
+      "scroll": 586,
+      "title": "Strategic Objectives",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/",
+      "width": 320,
+      "scroll": 320,
+      "title": "Good morning, System",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/work",
+      "width": 320,
+      "scroll": 320,
+      "title": "Work",
+      "offscreen": [
+        {
+          "tag": "INPUT",
+          "name": "title",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "status",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "monthly_focus_area_id",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "title",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "status",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "monthly_focus_area_id",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "route": "/admin",
+      "width": 320,
+      "scroll": 364,
+      "title": "People & Roles",
+      "offscreen": [
+        {
+          "tag": "INPUT",
+          "name": "name",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "email",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "password",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "job_title",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "role",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "manager_id",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "template_id",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "route": "/admin/templates",
+      "width": 320,
+      "scroll": 320,
+      "title": "Role Templates",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/admin/templates/1",
+      "width": 320,
+      "scroll": 403,
+      "title": "Principal",
+      "offscreen": [
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "INPUT",
+          "name": "name",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "focus_area_id",
+          "text": "— None —\nStrategic Leadership\n"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Add"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Add"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Remove"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Add"
+        }
+      ]
+    },
+    {
+      "role": "admin",
+      "route": "/team",
+      "width": 320,
+      "scroll": 320,
+      "title": "Team Overview",
+      "offscreen": []
+    },
+    {
+      "role": "admin",
+      "route": "/team/objectives",
+      "width": 320,
+      "scroll": 586,
+      "title": "Strategic Objectives",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Good morning, Amina",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/work",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Work",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/team",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Team Overview",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/team/5",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Hassan Ali QA",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/team/objectives",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Strategic Objectives",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/team/reports/1",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Weekly Report Review",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/",
+      "width": 768,
+      "scroll": 768,
+      "title": "Good morning, Amina",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/work",
+      "width": 768,
+      "scroll": 768,
+      "title": "Work",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/team",
+      "width": 768,
+      "scroll": 768,
+      "title": "Team Overview",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/team/5",
+      "width": 768,
+      "scroll": 768,
+      "title": "Hassan Ali QA",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/team/objectives",
+      "width": 768,
+      "scroll": 768,
+      "title": "Strategic Objectives",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/team/reports/1",
+      "width": 768,
+      "scroll": 768,
+      "title": "Weekly Report Review",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/",
+      "width": 390,
+      "scroll": 390,
+      "title": "Good morning, Amina",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/work",
+      "width": 390,
+      "scroll": 390,
+      "title": "Work",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/team",
+      "width": 390,
+      "scroll": 390,
+      "title": "Team Overview",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/team/5",
+      "width": 390,
+      "scroll": 390,
+      "title": "Hassan Ali QA",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/team/objectives",
+      "width": 390,
+      "scroll": 579,
+      "title": "Strategic Objectives",
+      "offscreen": [
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Retire objective"
+        }
+      ]
+    },
+    {
+      "role": "manager",
+      "route": "/team/reports/1",
+      "width": 390,
+      "scroll": 550,
+      "title": "Weekly Report Review",
+      "offscreen": [
+        {
+          "tag": "TEXTAREA",
+          "name": "manager_comment",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Approve report"
+        }
+      ]
+    },
+    {
+      "role": "manager",
+      "route": "/",
+      "width": 320,
+      "scroll": 320,
+      "title": "Good morning, Amina",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/work",
+      "width": 320,
+      "scroll": 320,
+      "title": "Work",
+      "offscreen": [
+        {
+          "tag": "INPUT",
+          "name": "title",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "status",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "monthly_focus_area_id",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "title",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "status",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "monthly_focus_area_id",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "role": "manager",
+      "route": "/team",
+      "width": 320,
+      "scroll": 320,
+      "title": "Team Overview",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/team/5",
+      "width": 320,
+      "scroll": 320,
+      "title": "Hassan Ali QA",
+      "offscreen": []
+    },
+    {
+      "role": "manager",
+      "route": "/team/objectives",
+      "width": 320,
+      "scroll": 579,
+      "title": "Strategic Objectives",
+      "offscreen": [
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Retire objective"
+        }
+      ]
+    },
+    {
+      "role": "manager",
+      "route": "/team/reports/1",
+      "width": 320,
+      "scroll": 550,
+      "title": "Weekly Report Review",
+      "offscreen": [
+        {
+          "tag": "TEXTAREA",
+          "name": "manager_comment",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": "Approve report"
+        }
+      ]
+    },
+    {
+      "role": "staff",
+      "route": "/",
+      "width": 1448,
+      "scroll": 1519,
+      "title": "Good morning, Hassan",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/daily",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Daily Update",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/daily/updates",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Daily Updates — October 2026",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/work",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Work",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/monthly",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Objectives",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/weekly",
+      "width": 1448,
+      "scroll": 1825,
+      "title": "Weekly Report",
+      "offscreen": [
+        {
+          "tag": "TEXTAREA",
+          "name": "challenges",
+          "text": ""
+        },
+        {
+          "tag": "TEXTAREA",
+          "name": "next_week_plan",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "role": "staff",
+      "route": "/reviews",
+      "width": 1448,
+      "scroll": 1448,
+      "title": "Monthly Review",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/",
+      "width": 768,
+      "scroll": 774,
+      "title": "Good morning, Hassan",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/daily",
+      "width": 768,
+      "scroll": 768,
+      "title": "Daily Update",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/daily/updates",
+      "width": 768,
+      "scroll": 768,
+      "title": "Daily Updates — October 2026",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/work",
+      "width": 768,
+      "scroll": 768,
+      "title": "Work",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/monthly",
+      "width": 768,
+      "scroll": 768,
+      "title": "Objectives",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/weekly",
+      "width": 768,
+      "scroll": 1335,
+      "title": "Weekly Report",
+      "offscreen": [
+        {
+          "tag": "TEXTAREA",
+          "name": "challenges",
+          "text": ""
+        },
+        {
+          "tag": "TEXTAREA",
+          "name": "next_week_plan",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "role": "staff",
+      "route": "/reviews",
+      "width": 768,
+      "scroll": 768,
+      "title": "Monthly Review",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/",
+      "width": 390,
+      "scroll": 762,
+      "title": "Good morning, Hassan",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/daily",
+      "width": 390,
+      "scroll": 390,
+      "title": "Daily Update",
+      "offscreen": [
+        {
+          "tag": "SELECT",
+          "name": "monthly_focus_area_id",
+          "text": "Operational or unplanned work\n"
+        },
+        {
+          "tag": "SELECT",
+          "name": "category_id",
+          "text": "Role category (optional)\nStrat"
+        }
+      ]
+    },
+    {
+      "role": "staff",
+      "route": "/daily/updates",
+      "width": 390,
+      "scroll": 479,
+      "title": "Daily Updates — October 2026",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/work",
+      "width": 390,
+      "scroll": 438,
+      "title": "Work",
+      "offscreen": [
+        {
+          "tag": "SELECT",
+          "name": "type",
+          "text": "⟳ All types\nPlanned\nRecurring\n"
+        },
+        {
+          "tag": "SELECT",
+          "name": "status",
+          "text": "◎ All statuses\nTo do\nIn progre"
+        },
+        {
+          "tag": "SELECT",
+          "name": "objective",
+          "text": "⌁ All objectives\nAudit 40 clas"
+        },
+        {
+          "tag": "INPUT",
+          "name": "q",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "title",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "status",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "monthly_focus_area_id",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "title",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "status",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "monthly_focus_area_id",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "title",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "status",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "monthly_focus_area_id",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "role": "staff",
+      "route": "/monthly",
+      "width": 390,
+      "scroll": 390,
+      "title": "Objectives",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/weekly",
+      "width": 390,
+      "scroll": 1323,
+      "title": "Weekly Report",
+      "offscreen": [
+        {
+          "tag": "TEXTAREA",
+          "name": "tasks_completed",
+          "text": ""
+        },
+        {
+          "tag": "TEXTAREA",
+          "name": "challenges",
+          "text": ""
+        },
+        {
+          "tag": "TEXTAREA",
+          "name": "next_week_plan",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "objective_progress_3",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "role": "staff",
+      "route": "/reviews",
+      "width": 390,
+      "scroll": 390,
+      "title": "Monthly Review",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/",
+      "width": 320,
+      "scroll": 762,
+      "title": "Good morning, Hassan",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/daily",
+      "width": 320,
+      "scroll": 320,
+      "title": "Daily Update",
+      "offscreen": [
+        {
+          "tag": "SELECT",
+          "name": "monthly_focus_area_id",
+          "text": "Operational or unplanned work\n"
+        },
+        {
+          "tag": "SELECT",
+          "name": "category_id",
+          "text": "Role category (optional)\nStrat"
+        }
+      ]
+    },
+    {
+      "role": "staff",
+      "route": "/daily/updates",
+      "width": 320,
+      "scroll": 479,
+      "title": "Daily Updates — October 2026",
+      "offscreen": [
+        {
+          "tag": "SELECT",
+          "name": "type",
+          "text": "All work types\nPlanned work\nRe"
+        },
+        {
+          "tag": "SELECT",
+          "name": "category",
+          "text": "All objectives\nStrategic plan "
+        },
+        {
+          "tag": "INPUT",
+          "name": "q",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "role": "staff",
+      "route": "/work",
+      "width": 320,
+      "scroll": 438,
+      "title": "Work",
+      "offscreen": [
+        {
+          "tag": "SELECT",
+          "name": "type",
+          "text": "⟳ All types\nPlanned\nRecurring\n"
+        },
+        {
+          "tag": "SELECT",
+          "name": "status",
+          "text": "◎ All statuses\nTo do\nIn progre"
+        },
+        {
+          "tag": "SELECT",
+          "name": "objective",
+          "text": "⌁ All objectives\nAudit 40 clas"
+        },
+        {
+          "tag": "INPUT",
+          "name": "q",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "title",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "status",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "monthly_focus_area_id",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": ""
+        },
+        {
+          "tag": "TEXTAREA",
+          "name": "text",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "status",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "title",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "status",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "monthly_focus_area_id",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "title",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "status",
+          "text": ""
+        },
+        {
+          "tag": "SELECT",
+          "name": "monthly_focus_area_id",
+          "text": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "role": "staff",
+      "route": "/monthly",
+      "width": 320,
+      "scroll": 320,
+      "title": "Objectives",
+      "offscreen": []
+    },
+    {
+      "role": "staff",
+      "route": "/weekly",
+      "width": 320,
+      "scroll": 1323,
+      "title": "Weekly Report",
+      "offscreen": [
+        {
+          "tag": "TEXTAREA",
+          "name": "tasks_completed",
+          "text": ""
+        },
+        {
+          "tag": "TEXTAREA",
+          "name": "challenges",
+          "text": ""
+        },
+        {
+          "tag": "TEXTAREA",
+          "name": "next_week_plan",
+          "text": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "objective_progress_3",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "role": "staff",
+      "route": "/reviews",
+      "width": 320,
+      "scroll": 320,
+      "title": "Monthly Review",
+      "offscreen": []
+    }
+  ]
+}

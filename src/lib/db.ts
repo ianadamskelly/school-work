@@ -41,6 +41,16 @@ function upgrade(db: Database.Database) {
   add("monthly_plans", "returned_at", "returned_at TEXT");
   add("work_items", "monthly_objective_id", "monthly_objective_id INTEGER REFERENCES monthly_objectives(id) ON DELETE SET NULL");
   add("work_items", "monthly_focus_area_id", "monthly_focus_area_id INTEGER REFERENCES monthly_focus_areas(id) ON DELETE SET NULL");
+  add("users", "session_version", "session_version INTEGER NOT NULL DEFAULT 0");
+  add("monthly_objectives", "archived", "archived INTEGER NOT NULL DEFAULT 0");
+  add("monthly_objectives", "carried_from_id", "carried_from_id INTEGER REFERENCES monthly_objectives(id) ON DELETE SET NULL");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_carried_objective ON monthly_objectives(plan_id, carried_from_id) WHERE carried_from_id IS NOT NULL");
+  add("monthly_focus_areas", "progress_percent", "progress_percent INTEGER NOT NULL DEFAULT 0 CHECK (progress_percent BETWEEN 0 AND 100)");
+  add("weekly_summaries", "activity_snapshot", "activity_snapshot TEXT NOT NULL DEFAULT ''");
+  add("weekly_summaries", "evidence_snapshot", "evidence_snapshot TEXT NOT NULL DEFAULT ''");
+  add("work_items", "recurrence", "recurrence TEXT NOT NULL DEFAULT 'none'");
+  add("work_items", "recurrence_parent_id", "recurrence_parent_id INTEGER REFERENCES work_items(id) ON DELETE SET NULL");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_recurring_occurrence ON work_items(recurrence_parent_id, due_date) WHERE recurrence_parent_id IS NOT NULL");
 
   // Preserve every existing single-objective plan as a member of the new
   // multi-objective plan structure.
@@ -66,11 +76,28 @@ function upgrade(db: Database.Database) {
     INSERT OR IGNORE INTO monthly_objectives (plan_id, legacy_strategic_objective_id, title, intended_outcome, sort)
     SELECT mpo.plan_id, o.id, o.title, o.description,
            0
-    FROM monthly_plan_objectives mpo JOIN objectives o ON o.id = mpo.objective_id;
+    FROM monthly_plan_objectives mpo JOIN objectives o ON o.id = mpo.objective_id
+    WHERE NOT EXISTS (
+      SELECT 1 FROM monthly_objectives existing
+      JOIN monthly_objective_strategic_links link ON link.monthly_objective_id = existing.id
+      WHERE existing.plan_id = mpo.plan_id AND link.strategic_objective_id = o.id
+    );
     INSERT OR IGNORE INTO monthly_objective_strategic_links (monthly_objective_id, strategic_objective_id)
     SELECT mo.id, mo.legacy_strategic_objective_id FROM monthly_objectives mo
     WHERE mo.legacy_strategic_objective_id IS NOT NULL;
   `);
+  // Keep superseded, untouched machine-generated records recoverable. Never
+  // archive a legacy objective with focus areas, work, or edited wording.
+  db.exec(`UPDATE monthly_objectives AS old SET archived = 1
+    WHERE old.legacy_strategic_objective_id IS NOT NULL
+      AND EXISTS (SELECT 1 FROM objectives o WHERE o.id = old.legacy_strategic_objective_id
+        AND old.title = o.title AND old.intended_outcome = o.description)
+      AND NOT EXISTS (SELECT 1 FROM monthly_focus_areas f WHERE f.monthly_objective_id = old.id)
+      AND NOT EXISTS (SELECT 1 FROM work_items w WHERE w.monthly_objective_id = old.id)
+      AND EXISTS (SELECT 1 FROM monthly_objectives modern
+        JOIN monthly_objective_strategic_links link ON link.monthly_objective_id = modern.id
+        WHERE modern.plan_id = old.plan_id AND modern.legacy_strategic_objective_id IS NULL
+          AND modern.archived = 0 AND link.strategic_objective_id = old.legacy_strategic_objective_id)`);
 }
 
 function migrate(db: Database.Database) {

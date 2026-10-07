@@ -9,7 +9,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!user) redirect("/login");
 
   const links: NavItem[] = [{ href: "/", label: "Home", icon: "home" }, { href: "/work", label: "Work", icon: "work" }];
-  if (user.template_id) {
+  {
     links.push(
       { href: "/daily/updates", label: "Daily Updates", icon: "daily" },
       { href: "/monthly", label: "Objectives", icon: "objectives" },
@@ -18,10 +18,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     );
   }
   if (user.role === "manager" || user.role === "admin") {
-    links.push({ href: "/team", label: "Team", icon: "team" });
+    links.push({ href: "/team", label: "Team", icon: "team", exact: true }, { href: "/team/objectives", label: "Strategic Objectives", icon: "objectives" }, { href: "/team?tab=objectives", label: "Team Approvals", icon: "team" });
   }
   if (user.role === "admin") {
-    links.push({ href: "/admin", label: "Admin", icon: "admin" });
+    links.push({ href: "/admin", label: "People & Roles", icon: "admin", exact: true }, { href: "/admin/templates", label: "Role Templates", icon: "admin" }, { href: "/admin/organisation", label: "Organisation", icon: "team" });
   }
 
   return (
@@ -42,10 +42,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
           <div className="flex h-[73px] items-center justify-between gap-4 px-4 sm:px-7">
             <Link href="/" className="flex items-center gap-2 font-bold text-slate-900 lg:hidden"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm text-white">P</span>Progress</Link>
-            <div className="hidden max-w-[378px] flex-1 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-400 md:flex"><span className="text-xl leading-none">⌕</span>Search tasks, people, objectives…</div>
-            <div className="ml-auto flex items-center gap-4"><span className="hidden text-sm font-medium text-slate-600 xl:block">▣&nbsp; {new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span><span className="hidden h-7 w-px bg-slate-200 sm:block" /><span className="hidden text-xl text-slate-500 sm:block">♧</span><span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700">{user.name.charAt(0)}</span><span className="hidden text-left sm:block"><span className="block text-sm font-semibold text-slate-900">{user.name}</span><span className="block text-xs text-slate-500">{user.job_title || user.role}</span></span></div>
+            <form action="/search" className="hidden max-w-[378px] flex-1 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm md:flex"><input name="q" aria-label="Search tasks, people, objectives" placeholder="Search tasks, people, objectives…" className="min-w-0 flex-1 bg-transparent outline-none" /><button className="text-blue-600">Search</button></form>
+            <div className="ml-auto flex items-center gap-4"><span className="hidden text-sm font-medium text-slate-600 xl:block">▣&nbsp; {new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</span><span className="hidden h-7 w-px bg-slate-200 sm:block" /><Link href={user.role === "employee" ? "/weekly" : "/team"} className="hidden text-xs text-blue-600 sm:block">Updates</Link><span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700">{user.name.charAt(0)}</span><span className="hidden text-left sm:block"><span className="block text-sm font-semibold text-slate-900">{user.name}</span><span className="block text-xs text-slate-500">{user.job_title || user.role}</span></span></div>
           </div>
-          <div className="border-t border-slate-100 px-4 py-2 lg:hidden"><AppShellNav items={links} /></div>
+          <div className="flex min-w-0 items-center gap-2 border-t border-slate-100 px-4 py-2 lg:hidden"><div className="min-w-0 flex-1"><AppShellNav items={links} /></div><form action={logout}><button className="whitespace-nowrap rounded-lg border border-slate-200 px-2 py-2 text-xs">Sign out</button></form></div>
         </header>
         <main className="mx-auto w-full max-w-[1190px] px-4 py-6 sm:px-7 lg:py-8">{children}</main>
       </div>

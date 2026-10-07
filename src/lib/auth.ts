@@ -27,7 +27,8 @@ export type SessionUser = {
 };
 
 export async function createSession(userId: number) {
-  const token = await new SignJWT({ uid: userId })
+  const version = (getDb().prepare("SELECT session_version FROM users WHERE id = ?").get(userId) as { session_version: number }).session_version;
+  const token = await new SignJWT({ uid: userId, sv: version })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("30d")
@@ -62,6 +63,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   try {
     const { payload } = await jwtVerify(token, getSecret());
     const uid = payload.uid as number;
+    const version = getDb().prepare("SELECT session_version FROM users WHERE id = ?").get(uid) as { session_version: number } | undefined;
+    if (!version || Number(payload.sv ?? 0) !== version.session_version) return null;
     const user = getDb()
       .prepare(
         "SELECT id, name, email, role, job_title, manager_id, template_id FROM users WHERE id = ? AND active = 1"

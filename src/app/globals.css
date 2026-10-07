@@ -22,3 +22,17 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* Grid/flex items must shrink around populated labels, not expand the viewport. */
+main, section, aside, form, fieldset, label, .grid > *, .flex > div {
+  min-width: 0;
+}
+input, select, textarea { min-width: 0; max-width: 100%; }
+h1, h2, h3, p, label, strong { overflow-wrap: anywhere; }
+@media (max-width: 639px) {
+  h1 { font-size: 30px !important; }
+  section > .flex.items-center.justify-between,
+  section > div > .flex.items-center.justify-between { flex-wrap: wrap; gap: 12px; }
+  .flex.w-44 { width: 80px; }
+  .grid.grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+}

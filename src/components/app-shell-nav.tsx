@@ -24,14 +24,14 @@ function NavIconGlyph({ name }: { name: NavIcon }) {
 export function AppShellNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
   return (
-    <nav className="space-y-1" aria-label="Main navigation">
+    <nav className="flex max-w-full gap-1 overflow-x-auto lg:block lg:space-y-1" aria-label="Main navigation">
       {items.map((item) => {
         const active = item.exact || item.href === "/" ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + "/");
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${active ? "bg-blue-50 text-blue-700 shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
+            className={`flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${active ? "bg-blue-50 text-blue-700 shadow-sm" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
           >
             <span aria-hidden="true" className={`${active ? "text-blue-600" : "text-slate-500"}`}><NavIconGlyph name={item.icon} /></span>
             {item.label}

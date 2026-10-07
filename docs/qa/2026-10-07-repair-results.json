@@ -1,0 +1,459 @@
+{
+  "date": "2026-10-07",
+  "environment": "Disposable local production server and SQLite fixture; no production data changed",
+  "summary": {
+    "backendPassed": 18,
+    "browserPassed": 91,
+    "failed": 0,
+    "responsiveChecks": 76,
+    "widths": [
+      320,
+      390,
+      768,
+      1448
+    ],
+    "typescript": "PASS",
+    "eslint": "PASS",
+    "standaloneBuild": "PASS"
+  },
+  "backend": [
+    {
+      "name": "QA-01 modern objectives survive restart without duplicates",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-01 legacy objectives retained and untouched generated duplicates archived",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-02 create objective-linked work",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-03 weekly objective progress persists across draft saves",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-04 and QA-05 submitted reports are locked and frozen",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-08 quick work updates appear in unified daily history",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-11 explicit focus progress does not count tasks as whole outcomes",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-14 invalid evidence never creates a partial daily update",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-10 daily and work status changes synchronize in both directions",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-15 unused evidence files are removed and report history is protected",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-18 recurring schedules generate independent idempotent occurrences",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-19 report period ends respect month length and leap years",
+      "status": "PASS"
+    },
+    {
+      "name": "Carry-forward copies agreed focus outcomes into an approval-required draft once",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-04 manager approval locks report and changes cannot reopen approved reports",
+      "status": "PASS"
+    },
+    {
+      "name": "Template rename and description update are persisted",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-06 last active administrator cannot be demoted or deactivated",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-13 active reports must be reassigned before manager demotion",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-12 resetting a password revokes old sessions",
+      "status": "PASS"
+    }
+  ],
+  "browser": [
+    {
+      "name": "Additional controls: scoped search and carry-forward routes work",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-03 progress input reloads its saved value",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-09 manager sees generated achievements and unified daily activity",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-16 monthly manager feedback is visible to staff",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-07 full 10 MB upload succeeds over HTTP and downloads intact",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-14 oversized input shows browser validation before POST",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-17 visible work filters submit selected values",
+      "status": "PASS"
+    },
+    {
+      "name": "Full workflow: complementary monthly objectives, manager revisions, resubmission and approval",
+      "status": "PASS"
+    },
+    {
+      "name": "Full workflow: weekly draft, feedback request, revision, resubmission and approval",
+      "status": "PASS"
+    },
+    {
+      "name": "Permissions: staff cannot access administrator or manager screens",
+      "status": "PASS"
+    },
+    {
+      "name": "Evidence: owner, direct manager and admin can download; signed-out visitors cannot",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 320px /",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 320px /admin",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 320px /admin/templates",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 320px /admin/templates/1",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 320px /admin/organisation",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 320px /team",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 390px /",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 390px /admin",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 390px /admin/templates",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 390px /admin/templates/1",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 390px /admin/organisation",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 390px /team",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 768px /",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 768px /admin",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 768px /admin/templates",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 768px /admin/templates/1",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 768px /admin/organisation",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 768px /team",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 1448px /",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 1448px /admin",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 1448px /admin/templates",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 1448px /admin/templates/1",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 1448px /admin/organisation",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive admin 1448px /team",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 320px /team",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 320px /team/3",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 320px /team/objectives",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 320px /team?tab=objectives",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 320px /team/reports/1",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 390px /team",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 390px /team/3",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 390px /team/objectives",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 390px /team?tab=objectives",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 390px /team/reports/1",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 768px /team",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 768px /team/3",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 768px /team/objectives",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 768px /team?tab=objectives",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 768px /team/reports/1",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 1448px /team",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 1448px /team/3",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 1448px /team/objectives",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 1448px /team?tab=objectives",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive manager 1448px /team/reports/1",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 320px /",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 320px /daily",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 320px /daily/updates?month=2026-10",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 320px /work?view=week",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 320px /monthly?year=2026&month=10",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 320px /weekly?year=2026&month=10&week=1",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 320px /reviews?year=2026&month=10",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 320px /search?q=Audit",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 390px /",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 390px /daily",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 390px /daily/updates?month=2026-10",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 390px /work?view=week",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 390px /monthly?year=2026&month=10",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 390px /weekly?year=2026&month=10&week=1",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 390px /reviews?year=2026&month=10",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 390px /search?q=Audit",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 768px /",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 768px /daily",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 768px /daily/updates?month=2026-10",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 768px /work?view=week",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 768px /monthly?year=2026&month=10",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 768px /weekly?year=2026&month=10&week=1",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 768px /reviews?year=2026&month=10",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 768px /search?q=Audit",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 1448px /",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 1448px /daily",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 1448px /daily/updates?month=2026-10",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 1448px /work?view=week",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 1448px /monthly?year=2026&month=10",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 1448px /weekly?year=2026&month=10&week=1",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 1448px /reviews?year=2026&month=10",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-20 responsive staff 1448px /search?q=Audit",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-21 daily form controls fit inside their form at 320px",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-22 mobile invitation form fits viewport and creates an employee",
+      "status": "PASS"
+    },
+    {
+      "name": "QA-23 compact mobile navigation exposes routes and sign-out",
+      "status": "PASS"
+    },
+    {
+      "name": "Login password visibility toggle works; administrator-reset guidance is visible",
+      "status": "PASS"
+    }
+  ]
+}

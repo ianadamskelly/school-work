@@ -6,7 +6,7 @@ export type MonthlyWorkObjective = {
   intended_outcome: string;
   priority: "normal" | "high";
   strategic_titles: string;
-  focus_areas: { id: number; title: string; target_outcome: string; work_total: number; completed_work: number }[];
+  focus_areas: { id: number; title: string; target_outcome: string; progress_percent: number; work_total: number; completed_work: number }[];
 };
 
 export function getMonthlyWorkObjectives(planId: number): MonthlyWorkObjective[] {
@@ -17,11 +17,11 @@ export function getMonthlyWorkObjectives(planId: number): MonthlyWorkObjective[]
      FROM monthly_objectives mo
      LEFT JOIN monthly_objective_strategic_links mosl ON mosl.monthly_objective_id = mo.id
      LEFT JOIN objectives so ON so.id = mosl.strategic_objective_id
-     WHERE mo.plan_id = ?
+     WHERE mo.plan_id = ? AND mo.archived = 0
      GROUP BY mo.id ORDER BY mo.sort, mo.id`
   ).all(planId) as Omit<MonthlyWorkObjective, "focus_areas">[];
   const focus = db.prepare(
-    `SELECT mfa.id, mfa.monthly_objective_id, mfa.title, mfa.target_outcome,
+    `SELECT mfa.id, mfa.monthly_objective_id, mfa.title, mfa.target_outcome, mfa.progress_percent,
             COUNT(wi.id) AS work_total,
             COALESCE(SUM(CASE WHEN wi.status = 'completed' THEN 1 ELSE 0 END), 0) AS completed_work
      FROM monthly_focus_areas mfa
@@ -33,4 +33,10 @@ export function getMonthlyWorkObjectives(planId: number): MonthlyWorkObjective[]
     ...objective,
     focus_areas: focus.filter((area) => area.monthly_objective_id === objective.id),
   }));
+}
+
+// Staff explicitly assess the agreed focus outcomes; logging one completed
+// task cannot silently declare the whole objective achieved.
+export function objectiveProgress(objective: MonthlyWorkObjective): number {
+  return objective.focus_areas.length ? Math.round(objective.focus_areas.reduce((sum, area) => sum + area.progress_percent, 0) / objective.focus_areas.length) : 0;
 }

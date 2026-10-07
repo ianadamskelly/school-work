@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { dailyUpdates } from "@/lib/work";
 import { notFound, redirect } from "next/navigation";
 import { getDb } from "@/lib/db";
 import { requireSessionUser } from "@/lib/auth";
@@ -30,7 +31,7 @@ export default async function PersonPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ reviewed?: string; approved?: string; commented?: string; feedback?: string }>;
+  searchParams: Promise<{ reviewed?: string; approved?: string; commented?: string; feedback?: string; year?: string; month?: string }>;
 }) {
   const user = await requireSessionUser();
   if (user.role !== "manager" && user.role !== "admin") redirect("/");
@@ -46,8 +47,8 @@ export default async function PersonPage({
 
   const today = todayISO();
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  const year = Number(query.year) >= 1970 && Number(query.year) <= 9999 ? Number(query.year) : now.getFullYear();
+  const month = Number(query.month) >= 1 && Number(query.month) <= 12 ? Number(query.month) : now.getMonth() + 1;
 
   const currentPlan = db
     .prepare(
@@ -84,13 +85,8 @@ export default async function PersonPage({
       )
       .all(reviewId) as { name: string; commentary: string }[];
 
-  const logs = db
-    .prepare(
-      `SELECT dl.id, dl.log_date, dl.activity, tc.name AS category, dl.hours, dl.status, dl.followup_required, dl.followup_date
-       FROM daily_logs dl LEFT JOIN task_categories tc ON tc.id = dl.category_id
-       WHERE dl.user_id = ? ORDER BY dl.log_date DESC, dl.id DESC LIMIT 15`
-    )
-    .all(person.id) as LogRow[];
+  const prefix = `${year}-${String(month).padStart(2, "0")}`;
+  const logs = dailyUpdates(person.id, prefix + "-01", prefix + "-" + String(new Date(year, month, 0).getDate())).slice(0, 15);
 
  const isOverdue = (l: LogRow) =>
    l.followup_required === 1 && l.status !== "Completed" && !!l.followup_date && l.followup_date < today;
@@ -105,6 +101,7 @@ export default async function PersonPage({
         <div className="flex items-center gap-4"><span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100 text-2xl font-bold text-blue-700">{person.name.charAt(0)}</span><div><Link href="/team" className="text-sm font-medium text-blue-600 hover:text-blue-700">← Back to team</Link><h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">{person.name}</h1><p className="mt-1 text-base text-slate-500">{person.job_title || "Team member"} · monthly planning, weekly reporting and review</p></div></div>
         <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-right"><p className="text-sm font-semibold text-emerald-800">{currentPlan?.status === "approved" ? "Plan approved" : currentPlan?.submitted_at ? "Plan awaiting review" : "Planning in progress"}</p><p className="mt-1 text-xs text-emerald-700">{MONTH_NAMES[month - 1]} {year}</p></div>
       </div>
+      <form className="flex flex-wrap items-end gap-2"><label className="text-xs text-slate-500">Reporting year<input name="year" type="number" min="1970" max="9999" defaultValue={year} className="block w-24 rounded-lg border border-slate-200 p-2" /></label><label className="text-xs text-slate-500">Month<select name="month" defaultValue={month} className="block rounded-lg border border-slate-200 p-2">{MONTH_NAMES.map((name, index) => <option key={name} value={index + 1}>{name}</option>)}</select></label><button className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white">View month</button></form>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"><p className="text-xs font-medium text-slate-500">Monthly objectives</p><p className="mt-1 text-2xl font-bold text-slate-950">{planObjectives.length}</p><p className="mt-1 text-xs text-blue-600">Current plan</p></div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"><p className="text-xs font-medium text-slate-500">Weekly reports</p><p className="mt-1 text-2xl font-bold text-slate-950">{submittedWeeks}</p><p className="mt-1 text-xs text-violet-600">Recent submissions</p></div>
