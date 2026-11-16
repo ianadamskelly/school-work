@@ -122,3 +122,9 @@ The GitHub `work-journal` branch replaces the old application deployment while t
 node tests/sqlite-d1.test.mjs
 npm run build:vps
 ```
+
+## Dashboard interface
+
+Staff, manager and administrator screens share one account menu and a single sign-out action. The overview shows monthly metrics, plan state, next actions and a weekly report shortcut. The month picker supports year navigation; empty accounts show no objective percentage until an objective exists. Manager report and administrator access tiles are filters. Mobile activity actions have a separate touch-friendly row.
+
+See `docs/dashboard-redesign-qa.md` for the dashboard questions, independently calculated fixture totals, retained design choices and screenshot checks. The optional visual QA helpers target only an isolated server on `127.0.0.1:5203` with a separate database under `outputs/dashboard-qa/`. They do not modify the normal local journal or production data.
