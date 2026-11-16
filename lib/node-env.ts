@@ -5,3 +5,4 @@ export const env={
  get APP_ORIGIN(){return process.env.APP_ORIGIN;},
  get BETTER_AUTH_SECRET(){return process.env.BETTER_AUTH_SECRET;},
 };
+export const selfHosted=true;

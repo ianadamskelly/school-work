@@ -1,5 +1,6 @@
+import {selfHosted} from 'work-journal-runtime';
 import { database } from './database';
 export async function digest(value:string){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));return Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');}
 export function token(){const bytes=crypto.getRandomValues(new Uint8Array(32));return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');}
 export async function limit(key:string,max:number,windowMs:number){const now=Date.now();const row=await database().prepare(`INSERT INTO journal_security_limits (key,count,window_start) VALUES (?,1,?) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN window_start<=? THEN 1 ELSE count+1 END,window_start=CASE WHEN window_start<=? THEN ? ELSE window_start END RETURNING count`).bind(key,now,now-windowMs,now-windowMs,now).first<{count:number}>();return !!row&&row.count<=max;}
-export function clientKey(req:Request){return (process.env.NODE_ENV==='development')?'local':req.headers.get('cf-connecting-ip')||'unknown';}
+export function clientKey(req:Request){return selfHosted?'vps':(process.env.NODE_ENV==='development')?'local':req.headers.get('cf-connecting-ip')||'unknown';}

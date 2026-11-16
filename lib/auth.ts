@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { APIError } from 'better-auth/api';
-import { env } from 'work-journal-runtime';
+import { env,selfHosted } from 'work-journal-runtime';
 import { headers } from 'next/headers';
 import { getDb } from '../db';
 import { authUser,authSession,authAccount,authVerification,authRateLimit } from '../db/auth-schema';
@@ -15,7 +15,7 @@ export function getAuth(){
   emailAndPassword:{enabled:true,disableSignUp:true,minPasswordLength:12,maxPasswordLength:128,requireEmailVerification:true},
   user:{changeEmail:{enabled:false},deleteUser:{enabled:false}},
   session:{expiresIn:8*60*60,updateAge:60*60,cookieCache:{enabled:false}},
-  trustedOrigins:[origin],advanced:{useSecureCookies:origin.startsWith('https:'),cookiePrefix:'work-journal',ipAddress:{ipAddressHeaders:(process.env.NODE_ENV==='development')?[]:['cf-connecting-ip']}},
+  trustedOrigins:[origin],advanced:{useSecureCookies:origin.startsWith('https:'),cookiePrefix:'work-journal',ipAddress:{ipAddressHeaders:(selfHosted||process.env.NODE_ENV==='development')?[]:['cf-connecting-ip']}},
   rateLimit:{enabled:true,storage:'database',window:60,max:100,customRules:{'/sign-in/email':{window:60,max:40}}},
   databaseHooks:{session:{create:{before:async session=>{const a=await database().prepare("SELECT user_id FROM journal_access WHERE user_id=? AND state='active'").bind(session.userId).first();if(!a)throw new APIError('FORBIDDEN',{message:'This account is not available. Contact your line manager or administrator.'});return {data:session};}}}},
   telemetry:{enabled:false},
