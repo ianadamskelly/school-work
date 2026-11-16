@@ -1,0 +1,395 @@
+{
+  "version": 1,
+  "academicYear": "2026-09",
+  "draftMonth": "2026-11",
+  "managerId": "local_principal",
+  "people": [
+    {
+      "key": "pyp",
+      "name": "Clare Pearl",
+      "email": "pypcoordinator@hia.edu.so",
+      "department": "PYP Coordination",
+      "sourceDocument": "PYP_Coordinator_Annual_Action_Plan_October_2026-June_18_2027 (1).docx",
+      "sourcePeriod": "October 2026–18 June 2027",
+      "strategies": [
+        {
+          "key": "mentoring",
+          "title": "PYP teacher mentoring and support",
+          "description": "Support and mentor new PYP teachers through monthly classroom visits and regular peer-observation opportunities, strengthening confidence and effectiveness in PYP practice.",
+          "novemberFocus": [
+            {
+              "key": "classroom-coaching",
+              "title": "Complete the November classroom-visit and individual-coaching cycle",
+              "target": 1,
+              "unit": "coaching cycles",
+              "weight": 1,
+              "sourceDeliverable": "Observation and feedback forms",
+              "sourceWindow": "7–12 November 2026"
+            }
+          ]
+        },
+        {
+          "key": "professional-learning",
+          "title": "PYP professional learning",
+          "description": "Identify professional-development needs and plan targeted internal workshops in consultation with school leadership.",
+          "novemberFocus": [
+            {
+              "key": "needs-analysis",
+              "title": "Complete the teacher professional-development needs analysis",
+              "target": 1,
+              "unit": "deliverable milestones",
+              "weight": 1,
+              "sourceDeliverable": "PD needs analysis agreed with leadership",
+              "sourceWindow": "31 October–5 November 2026"
+            },
+            {
+              "key": "workshop-one",
+              "title": "Deliver Internal Workshop 1 on the identified PYP practice priority",
+              "target": 1,
+              "unit": "workshops",
+              "weight": 1,
+              "sourceDeliverable": "Workshop materials and attendance record",
+              "sourceWindow": "14–19 November 2026"
+            }
+          ]
+        },
+        {
+          "key": "documentation-evaluation",
+          "title": "PYP documentation and evaluation readiness",
+          "description": "Align, organise, review and continuously update PYP documentation in preparation for Evaluation, accurately reflecting current practice, programme development and accessible evidence of implementation and continuous improvement.",
+          "novemberFocus": [
+            {
+              "key": "planning-templates",
+              "title": "Review and update PYP planning and documentation templates",
+              "target": 1,
+              "unit": "deliverable milestones",
+              "weight": 1,
+              "sourceDeliverable": "Revised planning/documentation templates",
+              "sourceWindow": "21–26 November 2026"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "myp",
+      "name": "Earnest Ondara",
+      "email": "mypcoordinator@hia.edu.so",
+      "department": "MYP Coordination",
+      "sourceDocument": "HIA_MYP_Coordinator_Daily_and_Annual_Action_Plan_2026-2027 (1).docx",
+      "sourcePeriod": "Academic year 2026–2027; annual windows September 2026–June 2027",
+      "strategies": [
+        {
+          "key": "registration",
+          "title": "MYP registration and eAssessment readiness",
+          "description": "Ensure eligible MYP5 learners are accurately registered for onscreen assessments and Grade 10 learners for the Personal Project, in line with confirmed official IB and school deadlines.",
+          "novemberFocus": [
+            {
+              "key": "candidate-access",
+              "title": "Review pre-mock candidate access and outstanding readiness issues",
+              "target": 1,
+              "unit": "deliverable milestones",
+              "weight": 1,
+              "sourceDeliverable": "Candidate access/readiness checklist and issues for follow-up",
+              "sourceWindow": "22–30 November 2026"
+            }
+          ]
+        },
+        {
+          "key": "idl",
+          "title": "MYP interdisciplinary learning",
+          "description": "Support teachers to plan, teach, assess and review meaningful interdisciplinary units and projects across MYP1–MYP5.",
+          "novemberFocus": [
+            {
+              "key": "idl-quality",
+              "title": "Review IDL projects for authentic disciplinary integration and a shared outcome",
+              "target": 1,
+              "unit": "deliverable milestones",
+              "weight": 1,
+              "sourceDeliverable": "IDL quality checklist and agreed teacher actions",
+              "sourceWindow": "15–21 November 2026"
+            }
+          ]
+        },
+        {
+          "key": "inquiry",
+          "title": "MYP inquiry-based learning",
+          "description": "Strengthen conceptual, inquiry-led teaching through questions, investigations, student voice, reflection and evidence-based conclusions.",
+          "novemberFocus": [
+            {
+              "key": "inquiry-evidence",
+              "title": "Review inquiry-based lesson evidence",
+              "target": 1,
+              "unit": "deliverable milestones",
+              "weight": 1,
+              "sourceDeliverable": "Learning-walk notes identifying strengths and areas for development",
+              "sourceWindow": "8–14 November 2026"
+            }
+          ]
+        },
+        {
+          "key": "personal-project",
+          "title": "MYP Personal Project coordination",
+          "description": "Monitor each learner’s progress, supervision, process journal, success criteria, product or outcome, and final submission.",
+          "novemberFocus": [
+            {
+              "key": "pp-review",
+              "title": "Complete the first structured Personal Project progress review",
+              "target": 1,
+              "unit": "deliverable milestones",
+              "weight": 1,
+              "sourceDeliverable": "PP RAG tracker and at-risk learner list",
+              "sourceWindow": "1–7 November 2026"
+            },
+            {
+              "key": "pp-intervention",
+              "title": "Run targeted Personal Project intervention sessions",
+              "target": 1,
+              "unit": "deliverable milestones",
+              "weight": 1,
+              "sourceDeliverable": "Intervention tracker and follow-up actions",
+              "sourceWindow": "8–14 November 2026"
+            },
+            {
+              "key": "pp-product",
+              "title": "Review product development and process journals",
+              "target": 1,
+              "unit": "deliverable milestones",
+              "weight": 1,
+              "sourceDeliverable": "PP consultation notes and progress tracker",
+              "sourceWindow": "15–21 November 2026"
+            },
+            {
+              "key": "pp-catchup",
+              "title": "Prepare catch-up plans for learners behind schedule",
+              "target": 1,
+              "unit": "deliverable milestones",
+              "weight": 1,
+              "sourceDeliverable": "At-risk learner catch-up plans",
+              "sourceWindow": "22–30 November 2026"
+            }
+          ]
+        },
+        {
+          "key": "teacher-support",
+          "title": "MYP teacher support and professional learning",
+          "description": "Coach teachers on MYP planning, approaches to teaching and learning, assessment criteria, achievement levels, feedback, moderation and ManageBac.",
+          "novemberFocus": [
+            {
+              "key": "teacher-coaching",
+              "title": "Coach teachers on questioning, investigation and student reflection",
+              "target": 1,
+              "unit": "coaching cycles",
+              "weight": 1,
+              "sourceDeliverable": "Coaching log with agreed actions and follow-up",
+              "sourceWindow": "8–14 November 2026"
+            }
+          ]
+        },
+        {
+          "key": "assessment-quality",
+          "title": "MYP curriculum and assessment quality",
+          "description": "Check unit planners, records of work, formative and summative assessment, grading consistency and timely ManageBac entry.",
+          "novemberFocus": [
+            {
+              "key": "premock-readiness",
+              "title": "Coordinate the MYP5 pre-mock readiness review",
+              "target": 1,
+              "unit": "deliverable milestones",
+              "weight": 1,
+              "sourceDeliverable": "Assessment-readiness checklist and outstanding actions",
+              "sourceWindow": "22–30 November 2026"
+            }
+          ]
+        },
+        {
+          "key": "inclusion",
+          "title": "MYP learner achievement and inclusion",
+          "description": "Use assessment evidence to identify learning gaps and support learners with developing English through vocabulary, visuals, command terms and clear instructions.",
+          "novemberFocus": [
+            {
+              "key": "learner-needs",
+              "title": "Review candidate learning needs before the pre-mock",
+              "target": 1,
+              "unit": "deliverable milestones",
+              "weight": 1,
+              "sourceDeliverable": "Learner access/support needs and agreed follow-up",
+              "sourceWindow": "22–30 November 2026"
+            }
+          ]
+        },
+        {
+          "key": "operations",
+          "title": "MYP programme operations and communication",
+          "description": "Coordinate across both campuses, maintain evidence, communicate risks early, and submit weekly and monthly progress reports.",
+          "novemberFocus": [
+            {
+              "key": "conferences",
+              "title": "Support parent/student/teacher conferences and record follow-up",
+              "target": 1,
+              "unit": "deliverable milestones",
+              "weight": 1,
+              "sourceDeliverable": "Conference notes and agreed actions",
+              "sourceWindow": "1–7 November 2026"
+            },
+            {
+              "key": "coordinator-evidence",
+              "title": "Compile November coordination evidence and escalate unresolved risks",
+              "target": 1,
+              "unit": "monthly evidence packs",
+              "weight": 1,
+              "sourceDeliverable": "Weekly coordinator reports, cross-campus follow-up and risk list",
+              "sourceWindow": "November 2026; recurring coordination and reporting responsibilities"
+            }
+          ]
+        },
+        {
+          "key": "service-as-action",
+          "title": "MYP Service as Action",
+          "description": "Train MYP1–MYP3 learners on Service as Action and its learning outcomes; guide planning, implementation, evidence and reflection, follow their development, and compile reports on the action.",
+          "novemberFocus": [
+            {
+              "key": "saa-monitoring",
+              "title": "Review Service as Action implementation, participation, evidence and reflection",
+              "target": 1,
+              "unit": "monitoring cycles",
+              "weight": 1,
+              "sourceDeliverable": "SAA monitoring notes, evidence and follow-up actions",
+              "sourceWindow": "November–December monitoring phase; November review milestone"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "dp",
+      "name": "Paul Kioko",
+      "email": "dpcoordinator@hia.edu.so",
+      "department": "DP Coordination",
+      "sourceDocument": "Weekly plan MR KIOKO.docx",
+      "sourcePeriod": "3 October 2026–30 January 2027",
+      "strategies": [
+        {
+          "key": "subject-selection",
+          "title": "DP subject selection and timetable stability",
+          "description": "Stabilise subject selection and confirm every DP1 student on the correct subject combination by the end of October. No completion or current student count is inferred from the plan.",
+          "novemberFocus": []
+        },
+        {
+          "key": "resources",
+          "title": "DP core resources and facilities",
+          "description": "Secure the core DP1 resources, including working projectors, printed CAS and Extended Essay guides, a stocked science laboratory and PE equipment for the CAS programme.",
+          "novemberFocus": [
+            {
+              "key": "laboratory",
+              "title": "Review laboratory safety, practicals records and remaining equipment gaps",
+              "target": 1,
+              "unit": "deliverable milestones",
+              "weight": 1,
+              "sourceDeliverable": "Updated inventory and safety-compliance note",
+              "sourceWindow": "21–28 November 2026"
+            }
+          ]
+        },
+        {
+          "key": "teaching-assessment",
+          "title": "DP teaching, assessment and research practice",
+          "description": "Build strong teaching and assessment practice, delivering research skills, internal-assessment preparation and at least two Extended Essay reflection sessions per month.",
+          "novemberFocus": [
+            {
+              "key": "observations",
+              "title": "Complete the second lesson-observation round on differentiation and questioning",
+              "target": 1,
+              "unit": "observation rounds",
+              "weight": 1,
+              "sourceDeliverable": "Observation sheets and written teacher feedback",
+              "sourceWindow": "7–14 November 2026"
+            },
+            {
+              "key": "ee-reflections",
+              "title": "Deliver Extended Essay reflection sessions on question formulation, source evaluation and reflection",
+              "target": 2,
+              "unit": "EE reflection sessions",
+              "weight": 1,
+              "sourceDeliverable": "Session evidence and annotated EE draft plans",
+              "sourceWindow": "November 2026; named session focus 14–21 November; strategic objective specifies at least two sessions per month"
+            },
+            {
+              "key": "ia-calendar",
+              "title": "Introduce the January-mock internal-assessment calendar",
+              "target": 1,
+              "unit": "deliverable milestones",
+              "weight": 1,
+              "sourceDeliverable": "Published internal-assessment calendar",
+              "sourceWindow": "14–21 November 2026"
+            }
+          ]
+        },
+        {
+          "key": "tracking-support",
+          "title": "DP student tracking and support",
+          "description": "Strengthen student tracking and support through individual conferences, attendance and progress monitoring, and early escalation of concerns to parents.",
+          "novemberFocus": [
+            {
+              "key": "cas-tracking",
+              "title": "Review CAS portfolio evidence and identify missing reflections or activity logs",
+              "target": 1,
+              "unit": "cohort review cycles",
+              "weight": 1,
+              "sourceDeliverable": "CAS portfolio tracker with flags and follow-up",
+              "sourceWindow": "21–28 November 2026"
+            }
+          ]
+        },
+        {
+          "key": "family-communication",
+          "title": "DP family and student communication",
+          "description": "Keep families and students informed through a regular communication rhythm, including November parent conferences and end-of-term progress reporting.",
+          "novemberFocus": [
+            {
+              "key": "parent-conferences",
+              "title": "Hold first-term parent conferences and agree follow-up actions",
+              "target": 1,
+              "unit": "conference cycles",
+              "weight": 1,
+              "sourceDeliverable": "Completed conference notes and follow-up actions",
+              "sourceWindow": "7–14 November 2026"
+            },
+            {
+              "key": "monthly-report",
+              "title": "Issue the November progress report and EE/CAS family update",
+              "target": 1,
+              "unit": "monthly report packs",
+              "weight": 1,
+              "sourceDeliverable": "Progress report and parent-update messages",
+              "sourceWindow": "November section, week 4: 28 November–1 December; confirm the calendar window before approval"
+            }
+          ]
+        },
+        {
+          "key": "teacher-collaboration",
+          "title": "DP core teacher collaboration",
+          "description": "Establish the Thursday collaboration rhythm so TOK, CAS and Extended Essay teachers plan together and agree assessment expectations.",
+          "novemberFocus": [
+            {
+              "key": "core-collaboration",
+              "title": "Agree TOK, CAS and EE expectations for the December push",
+              "target": 1,
+              "unit": "collaboration sessions",
+              "weight": 1,
+              "sourceDeliverable": "Agreed expectations note and shared resources",
+              "sourceWindow": "November section, week 4; confirm the Thursday session date before approval"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "Annual areas are sourced from the stated strategic/annual objectives. MYP includes the additional Service as Action responsibility as a ninth area.",
+    "Only document-supported November actions become monthly drafts. DP subject selection remains in the annual catalogue without inventing a November repeat.",
+    "All focus weights start at 1 and all deliverables at one milestone/cycle unless a source explicitly gives another target. These are reviewable draft targets, not approved performance standards.",
+    "The DP source contains inconsistent cohort figures (21 and 17); no student totals or per-student completion targets are imported.",
+    "Source calendar windows, including cross-month or inconsistent DP week labels, are retained as reference and require review. No activity, achieved progress, approval, actual evidence or sent communication is imported."
+  ]
+}

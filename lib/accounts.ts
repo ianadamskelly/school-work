@@ -1,0 +1,8 @@
+import { database } from './database';
+import { appOrigin } from './auth';
+import { digest,token } from './security';
+export function setupUrl(secret:string){return appOrigin()+'/setup#'+secret;}
+export async function canManageAccount(actor:any,targetId:string){if(actor.role==='admin')return true;if(actor.role!=='manager'||actor.id===targetId)return false;return !!await database().prepare("SELECT p.id FROM journal_people p JOIN journal_access a ON a.user_id=p.id WHERE p.id=? AND p.manager_id=? AND a.role!='admin'").bind(targetId,actor.id).first();}
+export async function newInvitation(userId:string,actorId:string){const secret=token(),hash=await digest(secret),now=Date.now(),expires=now+24*60*60*1000;return {secret,hash,expires,statement:database().prepare('INSERT INTO journal_invitations (id,user_id,token_hash,expires_at,created_by) VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),userId,hash,expires,actorId)};}
+export function auditStatement(actorId:string,action:string,targetId:string,detail:Record<string,any>={}){return database().prepare('INSERT INTO journal_account_audit (id,actor_id,action,target_id,detail,at) VALUES (?,?,?,?,?,?)').bind(crypto.randomUUID(),actorId,action,targetId,JSON.stringify(detail),Date.now());}
+export function guardedAudit(actorId:string,action:string,targetId:string,revision:string){return database().prepare('INSERT INTO journal_account_audit (id,actor_id,action,target_id,detail,at) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM journal_access WHERE user_id=? AND revision=?)').bind(crypto.randomUUID(),actorId,action,targetId,'{}',Date.now(),targetId,revision);}

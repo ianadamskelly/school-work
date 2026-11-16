@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {createDatabase} from '../lib/sqlite-d1.mjs';
+const db=createDatabase(':memory:');
+await db.exec('CREATE TABLE t (id INTEGER PRIMARY KEY,value TEXT NOT NULL)');
+const a=await db.prepare('INSERT INTO t VALUES (?,?)').bind(1,'one').run();assert.equal(a.meta.changes,1);
+assert.equal(await db.prepare('SELECT value FROM t WHERE id=?').bind(1).first('value'),'one');
+assert.deepEqual(await db.prepare('SELECT id,value FROM t').raw(),[[1,'one']]);
+const r=await db.batch([db.prepare("UPDATE t SET value='two' WHERE id=1 RETURNING value"),db.prepare('SELECT value FROM t')]);assert.equal(r[1].results[0].value,'two');
+await assert.rejects(db.batch([db.prepare("UPDATE t SET value='bad' WHERE id=1"),db.prepare('INSERT INTO t VALUES (1,NULL)')]));
+assert.equal(await db.prepare('SELECT value FROM t').first('value'),'two');
+assert.equal(await db.prepare('SELECT * FROM t WHERE id=99').first(),null);
+db.close();console.log('PASS: SQLite D1 compatibility, binding, raw mapping, returning, batch isolation and rollback.');

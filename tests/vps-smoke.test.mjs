@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import {randomBytes} from 'node:crypto';
+const base='http://127.0.0.1:5201',links=JSON.parse(fs.readFileSync('outputs/work-journal-setup-links.json','utf8'));
+async function req(path,data,cookie='',expected=200,origin=base){const r=await fetch(base+path,{redirect:'manual',method:data?'POST':'GET',headers:{Origin:origin,'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{})},body:data?JSON.stringify(data):undefined});const t=await r.text();assert.equal(r.status,expected,path+': '+t.slice(0,300));return {data:JSON.parse(t),cookie:r.headers.getSetCookie().map(x=>x.split(';')[0]).join('; ')};}
+const passwords=new Map();for(const email of ['smithinitianix@gmail.com','mypcoordinator@hia.edu.so']){const token=links.find(x=>x.email===email).url.split('#')[1],password=randomBytes(24).toString('hex');passwords.set(email,password);await req('/api/setup',{action:'activate',token,password});await req('/api/setup',{action:'activate',token,password},'',400);}
+const login=async email=>(await req('/api/auth/sign-in/email',{email,password:passwords.get(email)})).cookie;
+const admin=await login('smithinitianix@gmail.com'),staff=await login('mypcoordinator@hia.edu.so');
+await req('/api/records',undefined,admin,403);await req('/api/accounts',undefined,staff);const records=(await req('/api/records',undefined,staff)).data;assert.equal(records.filter(x=>x.kind==='strategy').length,9);assert.equal(records.filter(x=>x.kind==='objective').length,9);
+await req('/api/records',{action:'save',kind:'activity',data:{title:'Must fail',date:'2026-11-16',type:'planned',status:'done',focusId:records.find(x=>x.kind==='focus').id,contribution:1,outcome:'',evidence:'',challenge:'',solution:'',minutes:0,routineId:''}},staff,400);
+await req('/api/records',{action:'save',kind:'strategy',data:{title:'Cross-origin must fail',fromYear:'2026-09'}},staff,400,'https://untrusted.example');
+console.log('PASS: VPS bootstrap, password activation/replay rejection, real login sessions, administrator isolation, 9 MYP objectives, approval gate and origin protection.');

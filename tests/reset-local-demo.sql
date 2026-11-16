@@ -1,0 +1,2 @@
+-- Retired. Password-authenticated test fixtures remove only the temporary accounts they create.
+-- No reset of existing local staff journals is performed.

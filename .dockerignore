@@ -1,7 +1,12 @@
 node_modules
 .next
+dist
 .git
-data
-*.md
-.dockerignore
-Dockerfile
+.wrangler
+.sites-runtime
+.dev.vars*
+.env*
+outputs
+work
+*.tsbuildinfo
+.DS_Store
