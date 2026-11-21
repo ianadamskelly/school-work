@@ -27,18 +27,34 @@ function account(id,name,email,role,manager,department,state='invited'){
  if(state==='invited'){const token=randomBytes(32).toString('hex');db.prepare('INSERT INTO journal_invitations (id,user_id,token_hash,expires_at,created_by) VALUES (?,?,?,?,?)').run(randomUUID(),id,digest(token),now+86400000,'vps-bootstrap');links.push({name,email,url:origin+'/setup#'+token,expiresAt:new Date(now+86400000).toISOString()});}
  return id;
 }
-function record(owner,kind,slug,data){const id='vps-seed-'+digest(owner+'|'+kind+'|'+slug).slice(0,28);db.prepare('INSERT INTO journal_records (id,owner,kind,data,revision) VALUES (?,?,?,?,?) ON CONFLICT(id) DO NOTHING').run(id,owner,kind,JSON.stringify(data),randomUUID());return id;}
+const principalEmail = 'principal@hia.edu.so';
+const principalId = 'principal_pending';
 db.exec('CREATE TABLE IF NOT EXISTS _journal_bootstraps (name TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)');
+// Change only the original placeholder account. Retain its identity and reporting links.
+db.exec('BEGIN IMMEDIATE');
+try {
+ const principal = db.prepare('SELECT email FROM auth_user WHERE id = ?').get(principalId);
+ if (principal?.email === 'principal@journal.test') {
+  const conflict = db.prepare('SELECT id FROM auth_user WHERE lower(email) = ? AND id != ?').get(principalEmail, principalId);
+  if (conflict) {
+   console.warn('Principal email update skipped because the destination address belongs to another account.');
+  } else {
+   db.prepare('UPDATE auth_user SET email = ?, email_verified = 0, updated_at = ? WHERE id = ?').run(principalEmail, now, principalId);
+   db.prepare('UPDATE journal_people SET email = ? WHERE id = ?').run(principalEmail, principalId);
+  }
+ }
+ db.exec('COMMIT');
+} catch (error) {
+ db.exec('ROLLBACK');
+ throw error;
+}
 if(!db.prepare("SELECT 1 FROM _journal_bootstraps WHERE name='coordinators-v1'").get()){
 db.exec('BEGIN IMMEDIATE');try{
  account('system_admin','System Administrator','smithinitianix@gmail.com','admin',null,'');
- const principal=account('principal_pending','Principal (pending setup)','principal@journal.test','manager',null,'School Leadership','disabled');
+ const principal=account(principalId,'Principal (pending setup)',principalEmail,'manager',null,'School Leadership','disabled');
  account('ian','Ian','ict@hia.edu.so','manager',principal,'ICT Department');
- for(const p of manifest.people){const owner=account('coordinator_'+p.key,p.name,p.email,'manager',principal,p.department);record(owner,'strategy-settings','catalogue',{includeCore:false,programme:p.key.toUpperCase()});
-  for(const s of p.strategies){const strategyId=record(owner,'strategy',s.key,{title:s.title,description:s.description,fromYear:manifest.academicYear,sourceDocument:p.sourceDocument});if(!s.novemberFocus.length)continue;
-   const objectiveId=record(owner,'objective',s.key,{title:s.title+' — November 2026',month:manifest.draftMonth,description:s.description+'\n\nSource: '+p.sourceDocument+'. Dates and draft targets require review before approval.',strategyId,approvalStatus:'draft'});
-   for(const f of s.novemberFocus)record(owner,'focus',s.key+'|'+f.key,{title:f.title,objectiveId,target:f.target,unit:f.unit,weight:f.weight,sourceDeliverable:f.sourceDeliverable,sourceWindow:f.sourceWindow});
-  }
+ for (const p of manifest.people) {
+  account('coordinator_'+p.key,p.name,p.email,'manager',principal,p.department);
  }
  db.prepare('INSERT INTO _journal_bootstraps VALUES (?,?)').run('coordinators-v1',now);
  db.exec('COMMIT');
