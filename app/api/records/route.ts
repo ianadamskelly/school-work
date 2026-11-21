@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { body, database, fail, json, ownRecords, staffAccess } from '../../../lib/server';
-import { approval, canEditPlan, canWork } from '../../../lib/workflow';
+import { canEditPlan, canWork, noApprovalRequired, principalAccountId } from '../../../lib/workflow';
 import { catalogue,normalized,academicYear } from '../../../lib/strategy';
 import { weekStart,localDay } from '../../../lib/journal';
 export const dynamic='force-dynamic';
@@ -37,7 +37,7 @@ export async function POST(req:Request){
  if(kind==='objective'&&action==='save'&&d.strategyId&&!catalogue(es,d.month).some(s=>s.key===d.strategyId))return fail('Choose one of your strategic areas.');
  if(kind==='strategy'){if(action==='save')d.fromYear=old?.data.fromYear||d.fromYear||academicYear(localDay().slice(0,7)).start;if(action==='delete')return fail('Strategic areas are retained so annual coverage stays consistent.');if(catalogue(es).some(s=>s.key!==id&&normalized(s.title)===normalized(d.title)))return fail('This strategic area is already in your list.');}
  if(kind==='monthly'&&action==='save'){if(es.some(r=>r.kind==='monthly'&&r.id!==id&&r.data.month===d.month))return fail('A monthly review already exists. Refresh to load it.',409);if(d.reflections.some((r:any)=>!es.some(o=>o.id===r.objectiveId&&o.kind==='objective'&&o.data.month===d.month)))return fail('Monthly reflections must refer to your objectives in that month.');}
- if(kind==='objective'&&action==='save')d={...old?.data,...d,approvalStatus:old?.data.approvalStatus||'draft'};
+ if(kind==='objective'&&action==='save')d={...old?.data,...d,approvalStatus:me.id===principalAccountId?noApprovalRequired:old?.data.approvalStatus||'draft'};
  if(kind==='focus'){
   const objectiveId=action==='delete'?old?.data.objectiveId:d.objectiveId;parent=find(objectiveId,'objective');
   if(!parent)return fail('Choose an objective you own.');if(!canEditPlan(parent))return fail('Revise the objective before changing its focus areas.');

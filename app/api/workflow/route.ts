@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { body, database, fail, json, ownRecords, staffAccess, workflowState } from '../../../lib/server';
 import { annualCoverage,strategyKey } from '../../../lib/strategy';
 import { monthlySummary,monthlyText } from '../../../lib/monthly';
-import { approval, canEditPlan } from '../../../lib/workflow';
+import { approval, canEditPlan, principalAccountId } from '../../../lib/workflow';
 import { addDays, objectiveProgress, weeklyText, weekStart } from '../../../lib/journal';
 export const dynamic='force-dynamic';
 const short=z.string().trim().min(1).max(300), note=z.string().trim().max(10000).default('');
@@ -87,10 +87,11 @@ export async function POST(req:Request){
  if(o.revision!==d.revision)return fail('This plan changed. Refresh before continuing.',409);
  const employee=await db.prepare('SELECT * FROM journal_people WHERE id=?').bind(o.owner).first<any>();
  if(d.action==='decide-objective'){
-  if(employee?.manager_id!==me.id||o.data.submittedTo!==me.id||approval(o)!=='submitted')return fail('This plan is not awaiting your approval.',403);
+  if(o.owner===principalAccountId||employee?.manager_id!==me.id||o.data.submittedTo!==me.id||approval(o)!=='submitted')return fail('This plan is not awaiting your approval.',403);
   if(d.decision!=='approved'&&!d.reason.trim())return fail('Add a reason or suggestions so the employee knows what to improve.');
  } else {
   if(o.owner!==me.id)return fail('Objective not found.',404);
+  if(me.id===principalAccountId)return fail('Your objectives are ready to work on without approval.');
   if(d.action==='submit-objective'){
    if(!canEditPlan(o)&&approval(o)!=='legacy')return fail('This objective cannot be submitted in its current state.');
    if(!me.manager_id)return fail('Connect with your line manager before submitting a plan.');

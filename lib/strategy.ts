@@ -1,3 +1,4 @@
+import { canWork } from './workflow';
 import type { Entry } from './journal';
 import { localDay,objectiveProgress } from './journal';
 export type StrategicArea={key:string;title:string;description?:string};
@@ -14,7 +15,7 @@ export function annualCoverage(entries:Entry[],month:string,today=localDay()){
  const year=academicYear(month),asOf=[today,monthEnd(month)].sort()[0];
  const objective=entries.filter(e=>e.kind==='objective'&&e.data.month>=year.start&&e.data.month<=year.end);
  const dated=entries.filter(e=>e.kind!=='activity'||e.data.date<=asOf);
- const rows=catalogue(entries,month).map(s=>{const plans=objective.filter(o=>strategyKey(o,entries)===s.key);const focusIds=new Set(entries.filter(e=>e.kind==='focus'&&plans.some(o=>o.id===e.data.objectiveId)).map(e=>e.id));const work=entries.filter(e=>e.kind==='activity'&&focusIds.has(e.data.focusId)&&['done','in-progress'].includes(e.data.status)&&e.data.date>=year.start+'-01'&&e.data.date<=asOf&&e.data.date<=monthEnd(year.end));const months=[...new Set(work.map(e=>e.data.date.slice(0,7)))].sort();const approved=plans.filter(o=>o.data.month<=month&&['approved','legacy'].includes(o.data.approvalStatus||'legacy'));
+ const rows=catalogue(entries,month).map(s=>{const plans=objective.filter(o=>strategyKey(o,entries)===s.key);const focusIds=new Set(entries.filter(e=>e.kind==='focus'&&plans.some(o=>o.id===e.data.objectiveId)).map(e=>e.id));const work=entries.filter(e=>e.kind==='activity'&&focusIds.has(e.data.focusId)&&['done','in-progress'].includes(e.data.status)&&e.data.date>=year.start+'-01'&&e.data.date<=asOf&&e.data.date<=monthEnd(year.end));const months=[...new Set(work.map(e=>e.data.date.slice(0,7)))].sort();const approved=plans.filter(o=>o.data.month<=month&&canWork(o));
  const progressByMonth=new Map<string,number[]>();for(const o of approved){const values=progressByMonth.get(o.data.month)||[];values.push(objectiveProgress(o,dated));progressByMonth.set(o.data.month,values);}const monthlyProgress=[...progressByMonth.values()].map(v=>v.reduce((a,b)=>a+b,0)/v.length);
  return {...s,plannedMonths:[...new Set(approved.filter(o=>o.data.month<=month).map(o=>o.data.month))].sort(),workedMonths:months,activityCount:work.length,lastWorked:work.map(e=>e.data.date).sort().at(-1)||null,averageProgress:monthlyProgress.length?monthlyProgress.reduce((a,b)=>a+b,0)/monthlyProgress.length:0};});
  const covered=rows.filter(r=>r.workedMonths.length>0).length;

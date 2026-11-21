@@ -1,10 +1,44 @@
 import assert from 'node:assert/strict';import fs from 'node:fs';import {randomBytes} from 'node:crypto';
-const base='http://127.0.0.1:5201',links=JSON.parse(fs.readFileSync('outputs/work-journal-setup-links.json','utf8'));
+const base='http://127.0.0.1:5201',links=JSON.parse(fs.readFileSync(process.env.QA_SETUP_LINKS||'outputs/work-journal-setup-links.json','utf8'));
 async function req(path,data,cookie='',expected=200,origin=base){const r=await fetch(base+path,{redirect:'manual',method:data?'POST':'GET',headers:{Origin:origin,'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{})},body:data?JSON.stringify(data):undefined});const t=await r.text();assert.equal(r.status,expected,path+': '+t.slice(0,300));return {data:JSON.parse(t),cookie:r.headers.getSetCookie().map(x=>x.split(';')[0]).join('; ')};}
 const passwords=new Map();for(const email of ['smithinitianix@gmail.com','mypcoordinator@hia.edu.so']){const token=links.find(x=>x.email===email).url.split('#')[1],password=randomBytes(24).toString('hex');passwords.set(email,password);await req('/api/setup',{action:'activate',token,password});await req('/api/setup',{action:'activate',token,password},'',400);}
 const login=async email=>(await req('/api/auth/sign-in/email',{email,password:passwords.get(email)})).cookie;
 const admin=await login('smithinitianix@gmail.com'),staff=await login('mypcoordinator@hia.edu.so');
-await req('/api/records',undefined,admin,403);await req('/api/accounts',undefined,staff);const records=(await req('/api/records',undefined,staff)).data;assert.equal(records.filter(x=>x.kind==='strategy').length,9);assert.equal(records.filter(x=>x.kind==='objective').length,9);
-await req('/api/records',{action:'save',kind:'activity',data:{title:'Must fail',date:'2026-11-16',type:'planned',status:'done',focusId:records.find(x=>x.kind==='focus').id,contribution:1,outcome:'',evidence:'',challenge:'',solution:'',minutes:0,routineId:''}},staff,400);
+await req('/api/records',undefined,admin,403);
+assert.deepEqual((await req('/api/records',undefined,staff)).data,[]);
+const principalEmail='principal@hia.edu.so';
+const accounts=async()=> (await req('/api/accounts',undefined,admin)).data.users;
+const principalAccount=async()=> (await accounts()).find(user=>user.email===principalEmail);
+let principal=await principalAccount();
+await req('/api/accounts',{action:'status',id:principal.id,revision:principal.revision,state:'active'},admin);
+principal=await principalAccount();
+const invitation=(await req('/api/accounts',{action:'reset',id:principal.id,revision:principal.revision},admin)).data;
+const password=randomBytes(24).toString('hex');
+await req('/api/setup',{action:'activate',token:invitation.setupUrl.split('#')[1],password});
+passwords.set(principalEmail,password);
+const principalCookie=await login(principalEmail);
+const save=async(cookie,kind,data,old,expected=200)=>
+ (await req('/api/records',{action:'save',kind,data,id:old?.id,revision:old?.revision},cookie,expected)).data;
+const objective={title:'QA objective',month:'2026-11'};
+const focus={title:'QA target',target:2,unit:'checks',weight:1};
+const activity={title:'QA work',date:'2026-11-16',type:'planned',status:'done',contribution:1};
+const principalObjective=await save(principalCookie,'objective',objective);
+assert.equal(principalObjective.data.approvalStatus,'approval-not-required');
+const principalFocus=await save(principalCookie,'focus',{...focus,objectiveId:principalObjective.id});
+await save(principalCookie,'activity',{...activity,focusId:principalFocus.id});
+const updated=(await req('/api/records',undefined,principalCookie)).data.find(row=>row.id===principalObjective.id);
+const revised=await save(principalCookie,'objective',{...objective,title:'QA revised objective'},updated);
+const bypass=await req('/api/workflow',{action:'submit-objective',id:revised.id,revision:revised.revision},principalCookie,400);
+assert.match(bypass.data.error,/without approval/);
+const staffObjective=await save(staff,'objective',{...objective,approvalStatus:'approval-not-required'});
+assert.equal(staffObjective.data.approvalStatus,'draft');
+const staffFocus=await save(staff,'focus',{...focus,objectiveId:staffObjective.id});
+await save(staff,'activity',{...activity,focusId:staffFocus.id},undefined,400);
+const staffPlan=(await req('/api/records',undefined,staff)).data.find(row=>row.id===staffObjective.id);
+await req('/api/workflow',{action:'submit-objective',id:staffPlan.id,revision:staffPlan.revision},staff);
+const team=(await req('/api/team?week=2026-11-14',undefined,principalCookie)).data;
+assert.deepEqual(team.plans.map(plan=>plan.id),[staffPlan.id]);
+await req('/api/workflow',{action:'decide-objective',id:staffPlan.id,revision:team.plans[0].revision,decision:'approved'},principalCookie);
+await save(staff,'activity',{...activity,focusId:staffFocus.id});
 await req('/api/records',{action:'save',kind:'strategy',data:{title:'Cross-origin must fail',fromYear:'2026-09'}},staff,400,'https://untrusted.example');
-console.log('PASS: VPS bootstrap, password activation/replay rejection, real login sessions, administrator isolation, 9 MYP objectives, approval gate and origin protection.');
+console.log('PASS: clean VPS bootstrap, setup and real sessions, Principal can edit and log work immediately, MYP still needs approval, Principal can approve a direct report, origin protection.');
